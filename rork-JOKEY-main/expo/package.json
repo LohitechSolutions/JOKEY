@@ -57,8 +57,7 @@
     "typescript": "~5.9.2"
   },
   "overrides": {
-    "axios": "1.13.2",
-    "expo-location": "19.0.8"
+    "axios": "1.13.2"
   },
   "private": true
 }
