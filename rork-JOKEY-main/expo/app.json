@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "Blagues Audio",
+    "name": "Jokey",
     "slug": "azbb4413e811lknfmyslw",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/icon.jpeg",
     "scheme": "rork-app",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -26,8 +26,9 @@
       "bundleIdentifier": "app.rork.azbb4413e811lknfmyslw"
     },
     "android": {
+      "versionCode": 2,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "foregroundImage": "./assets/images/icon.jpeg",
         "backgroundColor": "#ffffff"
       },
       "package": "app.rork.azbb4413e811lknfmyslw",

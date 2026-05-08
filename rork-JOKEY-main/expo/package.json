@@ -1,5 +1,5 @@
 {
-  "name": "expo-app",
+  "name": "jokey",
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
@@ -8,6 +8,9 @@
     "start-web-dev": "DEBUG=expo* bunx rork start -p azbb4413e811lknfmyslw --web --tunnel",
     "lint": "expo lint",
     "android": "expo run:android",
+    "build:apk-debug": "expo prebuild --platform android && cd android && ./gradlew assembleDebug",
+    "build:apk-release": "expo prebuild --platform android && cd android && ./gradlew assembleRelease",
+    "build:aab": "expo prebuild --platform android && cd android && ./gradlew bundleRelease",
     "ios": "expo run:ios"
   },
   "dependencies": {
@@ -29,6 +32,7 @@
     "expo-image-picker": "~17.0.9",
     "expo-linear-gradient": "~15.0.8",
     "expo-linking": "~8.0.10",
+    "expo-location": "~19.0.8",
     "expo-router": "~6.0.17",
     "expo-splash-screen": "~31.0.12",
     "expo-status-bar": "~3.0.9",
@@ -57,7 +61,8 @@
     "typescript": "~5.9.2"
   },
   "overrides": {
-    "axios": "1.13.2"
+    "axios": "1.13.2",
+    "expo-location": "~19.0.8"
   },
   "private": true
 }

@@ -14,6 +14,7 @@ ios/
 android/
 *.orig.*
 *.jks
+credentials/upload-keystore-password.txt
 *.p8
 *.p12
 *.key
