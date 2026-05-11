@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import createContextHook from '@nkzw/create-context-hook';
@@ -6,8 +6,9 @@ import { User, Joke, ReactionEmoji, SubscriptionPlan } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { setCachedUser, getCachedUser } from '@/lib/auth-storage';
 import { clientRegister, clientLogin, clientDeleteAccount, clientRequestPasswordReset, clientConfirmPasswordReset, signOutSupabase, clientGetMe } from '@/lib/auth-client';
-import { ensureDBReady, fetchJokesFromDB, toggleReactionInDB, rateJokeInDB, toggleFollowInDB, deleteJokeFromDB } from '@/lib/db-client';
+import { ensureDBReady, fetchJokesFromDB, toggleReactionInDB, rateJokeInDB, toggleFollowInDB, deleteJokeFromDB, ensureUserRecordExists } from '@/lib/db-client';
 import { isSupabaseConfigured } from '@/lib/supabase';
+import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 
 const STORAGE_KEYS = {
   SUBSCRIPTION: 'joky_subscription',
@@ -53,12 +54,24 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const [tipsBalance, setTipsBalance] = useState<Record<string, number>>({});
   const [dbReady, setDbReady] = useState<boolean>(false);
 
+  // ─── Single global audio player ───────────────────────────────────────────
+  const globalPlayer = useAudioPlayer(null);
+  const globalAudioStatus = useAudioPlayerStatus(globalPlayer);
+  // Tracks whether we are waiting for audio to load before playing
+  const pendingPlay = useRef(false);
+
   useEffect(() => {
     let cancelled = false;
 
     const initDB = async () => {
       console.log('[AppContext] Initializing Supabase DB...');
       try {
+        // Initialize Audio Mode (expo-audio compatible params only)
+        await setAudioModeAsync({
+          playsInSilentMode: true,
+          allowsRecording: false,
+        }).catch(err => console.log('[AppContext] Audio mode error:', err));
+
         const ok = await ensureDBReady();
         if (!cancelled) {
           console.log('[AppContext] Supabase DB ready:', ok);
@@ -191,13 +204,18 @@ export const [AppProvider, useApp] = createContextHook(() => {
         setCurrentUser(authQuery.data);
         setIsAuthenticated(true);
         console.log('[AppContext] User restored:', authQuery.data.username);
+        
+        // Ensure user record exists in Supabase
+        if (dbReady) {
+          ensureUserRecordExists(authQuery.data);
+        }
       } else {
         setCurrentUser(null);
         setIsAuthenticated(false);
       }
       setAuthChecked(true);
     }
-  }, [authQuery.data, authQuery.isFetched]);
+  }, [authQuery.data, authQuery.isFetched, dbReady]);
 
   useEffect(() => {
     if (authQuery.isError) {
@@ -305,6 +323,11 @@ export const [AppProvider, useApp] = createContextHook(() => {
       setCurrentUser(user);
       setIsAuthenticated(true);
       setAuthError(null);
+      
+      // Ensure user record exists in Supabase
+      if (dbReady) {
+        ensureUserRecordExists(user);
+      }
     },
     onError: (error: Error) => {
       console.error('[AppContext] Auth error:', error.message);
@@ -709,6 +732,45 @@ export const [AppProvider, useApp] = createContextHook(() => {
     void queryClient.invalidateQueries({ queryKey: ['jokes-list'] });
   }, [queryClient]);
 
+  // ─── Global audio play / pause ────────────────────────────────────────────
+
+  // When audio finishes, clear playing state
+  useEffect(() => {
+    if (globalAudioStatus.didJustFinish) {
+      pendingPlay.current = false;
+      setPlayingJokeId(null);
+    }
+  }, [globalAudioStatus.didJustFinish]);
+
+  // When audio becomes loaded AND we have a pending play request → start playing
+  useEffect(() => {
+    if (pendingPlay.current && globalAudioStatus.isLoaded && !globalAudioStatus.playing) {
+      console.log('[Audio] Source loaded — starting playback now');
+      pendingPlay.current = false;
+      globalPlayer.volume = 1.0;
+      globalPlayer.play();
+    }
+  }, [globalAudioStatus.isLoaded, globalAudioStatus.playing, globalPlayer]);
+
+  const playJoke = useCallback((joke: Joke) => {
+    if (!joke.audioUri) {
+      console.log('[Audio] No audioUri for joke:', joke.id);
+      return;
+    }
+    console.log('[Audio] Loading joke:', joke.id, 'uri:', joke.audioUri);
+    setPlayingJokeId(joke.id);
+    pendingPlay.current = true;
+    // replace() loads the new source; play() will be triggered once isLoaded becomes true
+    globalPlayer.replace({ uri: joke.audioUri });
+  }, [globalPlayer]);
+
+  const pauseAudio = useCallback(() => {
+    console.log('[Audio] Pausing');
+    pendingPlay.current = false;
+    globalPlayer.pause();
+    setPlayingJokeId(null);
+  }, [globalPlayer]);
+
   return useMemo(() => ({
     currentUser,
     isAuthenticated,
@@ -718,6 +780,9 @@ export const [AppProvider, useApp] = createContextHook(() => {
     followingIds,
     playingJokeId,
     setPlayingJokeId,
+    playJoke,
+    pauseAudio,
+    globalAudioStatus,
     login,
     register,
     logout,
@@ -762,7 +827,8 @@ export const [AppProvider, useApp] = createContextHook(() => {
     isConfirmingReset: confirmPasswordResetMutation.isPending,
   }), [
     currentUser, isAuthenticated, authChecked, authError, jokes, followingIds,
-    playingJokeId, login, register, logout, deleteAccount, toggleFollow,
+    playingJokeId, playJoke, pauseAudio, globalAudioStatus,
+    login, register, logout, deleteAccount, toggleFollow,
     addReaction, rateJoke, addJoke, deleteJoke, deleteJokeMutation.isPending, isFollowing, getJokeReactions, getMyRating,
     totalReactions, isSubscribed, subscriptionPlan, subscribe,
     listenCount, createCount, incrementListenCount, incrementCreateCount,

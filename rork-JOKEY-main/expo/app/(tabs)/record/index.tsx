@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
   Alert,
   Platform,
 } from 'react-native';
-import { Mic, Square, RotateCcw, Send, ChevronDown, Loader } from 'lucide-react-native';
+import { Mic, Square, RotateCcw, Send, ChevronDown, Loader, Play, Pause } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import {
   useAudioRecorder,
@@ -18,6 +18,8 @@ import {
   RecordingPresets,
   AudioModule,
   setAudioModeAsync,
+  useAudioPlayer,
+  useAudioPlayerStatus,
 } from 'expo-audio';
 import Colors from '@/constants/colors';
 import { CATEGORIES } from '@/mocks/data';
@@ -43,6 +45,10 @@ export default function RecordScreen() {
 
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(audioRecorder, 500);
+
+  const previewSource = useMemo(() => recordedUri ? { uri: recordedUri } : null, [recordedUri]);
+  const previewPlayer = useAudioPlayer(previewSource);
+  const previewStatus = useAudioPlayerStatus(previewPlayer);
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const progressAnim = useRef(new Animated.Value(0)).current;
@@ -106,6 +112,7 @@ export default function RecordScreen() {
 
   const startRecording = useCallback(async () => {
     try {
+      // Always ensure permissions are granted
       if (!permissionGranted) {
         const status = await AudioModule.requestRecordingPermissionsAsync();
         if (!status.granted) {
@@ -113,11 +120,15 @@ export default function RecordScreen() {
           return;
         }
         setPermissionGranted(true);
-        await setAudioModeAsync({
-          playsInSilentMode: true,
-          allowsRecording: true,
-        });
       }
+
+      // Always re-enable recording mode before each recording session.
+      // stopRecording sets allowsRecording back to false, so this MUST
+      // be called every time — not just on first permission grant.
+      await setAudioModeAsync({
+        playsInSilentMode: true,
+        allowsRecording: true,
+      });
 
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
       setHasRecording(false);
@@ -228,7 +239,7 @@ export default function RecordScreen() {
         language: newJoke.language,
         level: newJoke.level,
         allowComments: newJoke.allowComments,
-      }).then(() => {
+      }, currentUser).then(() => {
         console.log('[Record] Joke saved to Supabase with audio URL');
       }).catch((err) => {
         console.warn('[Record] Failed to save to Supabase (local only):', err);
@@ -283,8 +294,23 @@ export default function RecordScreen() {
 
         <View style={styles.buttonRow}>
           {hasRecording && !isRecording && (
-            <TouchableOpacity style={styles.secondaryBtn} onPress={resetRecording}>
-              <RotateCcw size={22} color={Colors.textSecondary} />
+            <TouchableOpacity 
+              style={[styles.secondaryBtn, { backgroundColor: Colors.primary + '20', borderColor: Colors.primary }]} 
+              onPress={() => {
+                if (previewStatus.playing) {
+                  previewPlayer.pause();
+                } else {
+                  previewPlayer.volume = 1.0;
+                  try { previewPlayer.seekTo(0); } catch (e) { console.log('[Record] seekTo error:', e); }
+                  previewPlayer.play();
+                }
+              }}
+            >
+              {previewStatus.playing ? (
+                <Pause size={24} color={Colors.primary} fill={Colors.primary} />
+              ) : (
+                <Play size={24} color={Colors.primary} fill={Colors.primary} />
+              )}
             </TouchableOpacity>
           )}
 
@@ -307,7 +333,9 @@ export default function RecordScreen() {
           </Animated.View>
 
           {hasRecording && !isRecording && (
-            <View style={{ width: 56 }} />
+            <TouchableOpacity style={styles.secondaryBtn} onPress={resetRecording}>
+              <RotateCcw size={22} color={Colors.textSecondary} />
+            </TouchableOpacity>
           )}
         </View>
 

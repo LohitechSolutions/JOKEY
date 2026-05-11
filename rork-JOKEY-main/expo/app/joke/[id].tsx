@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   TextInput,
   Image,
-  Animated,
   KeyboardAvoidingView,
   Platform,
   Share,
@@ -43,40 +42,39 @@ function timeAgo(dateStr: string, tFn: (key: string, params?: Record<string, str
 export default function JokeDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { jokes, playingJokeId, setPlayingJokeId, addReaction, getJokeReactions, totalReactions } = useApp();
+  const {
+    jokes,
+    playingJokeId,
+    playJoke,
+    pauseAudio,
+    globalAudioStatus,
+    addReaction,
+    getJokeReactions,
+    totalReactions,
+  } = useApp();
   const [commentText, setCommentText] = useState('');
-  const [progress] = useState(new Animated.Value(0));
-  const progressAnim = useRef<Animated.CompositeAnimation | null>(null);
 
   const { t } = useLanguage();
   const joke = useMemo(() => jokes.find(j => j.id === id), [jokes, id]);
   const myReactions = joke ? getJokeReactions(joke.id) : [];
   const category = joke ? CATEGORIES.find(c => c.id === joke.category) : null;
-  const isPlaying = playingJokeId === id;
+
+  const isThisJokePlaying = playingJokeId === id;
+  const isPlaying = isThisJokePlaying && globalAudioStatus.playing;
+  const progressPercent = isThisJokePlaying && globalAudioStatus.duration > 0
+    ? (globalAudioStatus.currentTime / globalAudioStatus.duration) * 100
+    : 0;
 
   const handlePlay = useCallback(() => {
     if (!joke) return;
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
     if (isPlaying) {
-      setPlayingJokeId(null);
-      if (progressAnim.current) progressAnim.current.stop();
-      progress.setValue(0);
+      pauseAudio();
     } else {
-      setPlayingJokeId(joke.id);
-      progress.setValue(0);
-      progressAnim.current = Animated.timing(progress, {
-        toValue: 1,
-        duration: joke.duration * 1000,
-        useNativeDriver: false,
-      });
-      progressAnim.current.start(({ finished }) => {
-        if (finished) {
-          setPlayingJokeId(null);
-          progress.setValue(0);
-        }
-      });
+      playJoke(joke);
     }
-  }, [isPlaying, joke, setPlayingJokeId, progress]);
+  }, [isPlaying, joke, playJoke, pauseAudio]);
 
   const handleReaction = useCallback((emoji: ReactionEmoji) => {
     if (!joke) return;
@@ -122,11 +120,6 @@ export default function JokeDetailScreen() {
       </View>
     );
   }
-
-  const progressWidth = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0%', '100%'],
-  });
 
   return (
     <KeyboardAvoidingView
@@ -181,12 +174,16 @@ export default function JokeDetailScreen() {
 
           <View style={styles.playerInfo}>
             <View style={styles.progressTrack}>
-              <Animated.View style={[styles.progressFill, { width: progressWidth }]} />
+              <View style={[styles.progressFill, { width: `${Math.min(progressPercent, 100)}%` }]} />
             </View>
             <View style={styles.playerMeta}>
               <View style={styles.durationBadge}>
                 <Clock size={12} color={Colors.textMuted} />
-                <Text style={styles.durationText}>{formatDuration(joke.duration)}</Text>
+                <Text style={styles.durationText}>
+                  {isThisJokePlaying && globalAudioStatus.currentTime > 0
+                    ? `${formatDuration(globalAudioStatus.currentTime)} / ${formatDuration(globalAudioStatus.duration || joke.duration)}`
+                    : formatDuration(joke.duration)}
+                </Text>
               </View>
               {isPlaying && (
                 <View style={styles.liveIndicator}>

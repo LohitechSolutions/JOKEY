@@ -145,6 +145,61 @@ export async function fetchUserById(userId: string): Promise<User | null> {
   }
 }
 
+/**
+ * Ensures a user record exists in the 'users' table to avoid foreign key violations.
+ */
+export async function ensureUserRecordExists(user: User): Promise<void> {
+  if (!isClientDBAvailable()) return;
+
+  try {
+    // First check if user exists
+    const { data: existing, error: checkError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', user.id)
+      .single();
+
+    if (existing && !checkError) {
+      return;
+    }
+
+    console.log('[DB] Creating missing user record for:', user.id);
+    
+    // Try to get email from auth if not in user object
+    let email = (user as any).email;
+    if (!email) {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (authUser?.id === user.id) {
+        email = authUser.email;
+      }
+    }
+
+    const { error: insertError } = await supabase.from('users').insert({
+      id: user.id,
+      username: user.username,
+      email: email || '',
+      display_name: user.displayName,
+      avatar: user.avatar,
+      bio: user.bio,
+      language: user.language,
+      role: user.role,
+      jokes_count: user.jokesCount,
+      total_likes: user.totalLikes,
+      followers_count: user.followersCount,
+      following_count: user.followingCount,
+      badges: user.badges,
+    });
+
+    if (insertError) {
+      console.warn('[DB] Failed to create user record:', insertError.message);
+    } else {
+      console.log('[DB] User record created successfully');
+    }
+  } catch (err: any) {
+    console.warn('[DB] Error in ensureUserRecordExists:', err?.message);
+  }
+}
+
 export async function uploadAudioToSupabase(localUri: string, jokeId: string): Promise<string> {
   console.log('[DB] Uploading audio to Supabase Storage...', localUri);
 
@@ -200,7 +255,13 @@ export async function createJokeInDB(joke: {
   language: string;
   level: string;
   allowComments: boolean;
-}): Promise<void> {
+}, user?: User): Promise<void> {
+  // If user object is provided, ensure the record exists in the 'users' table
+  // to prevent foreign key violations.
+  if (user) {
+    await ensureUserRecordExists(user);
+  }
+
   const { error } = await supabase.from('jokes').insert({
     id: joke.id,
     user_id: joke.userId,
@@ -222,6 +283,13 @@ export async function createJokeInDB(joke: {
 
   if (error) {
     console.error('[DB] Error creating joke:', error.message);
+    
+    // If it's a foreign key error and we didn't have the user object yet, 
+    // it's a strong sign the user record is missing.
+    if (error.message.includes('foreign key constraint') && !user) {
+      console.warn('[DB] Joke creation failed due to missing user record. Consider passing the user object.');
+    }
+    
     throw new Error(error.message);
   }
   console.log('[DB] Joke created:', joke.id);

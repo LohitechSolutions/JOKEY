@@ -12,7 +12,6 @@ import {
 } from 'react-native';
 import { Play, Pause, MessageCircle, Share2, Clock, Star, Volume2 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { Joke, ReactionEmoji } from '@/types';
 import { REACTION_EMOJIS, CATEGORIES } from '@/mocks/data';
 import Colors from '@/constants/colors';
@@ -51,57 +50,43 @@ function timeAgo(dateStr: string, tFn: (key: string, params?: Record<string, str
 
 export default React.memo(function JokeCard({ joke, onPlay, compact }: JokeCardProps) {
   const router = useRouter();
-  const { playingJokeId, setPlayingJokeId, addReaction, getJokeReactions, rateJoke, getMyRating, incrementListenCount } = useApp();
+  const {
+    playingJokeId,
+    playJoke,
+    pauseAudio,
+    globalAudioStatus,
+    addReaction,
+    getJokeReactions,
+    rateJoke,
+    getMyRating,
+    incrementListenCount,
+  } = useApp();
   const { t } = useLanguage();
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const myReactions = getJokeReactions(joke.id);
   const myRating = getMyRating(joke.id);
   const category = CATEGORIES.find(c => c.id === joke.category);
-  const audioSource = joke.audioUri ? { uri: joke.audioUri } : null;
-  const player = useAudioPlayer(audioSource);
-  const status = useAudioPlayerStatus(player);
 
-  const progressPercent = status.duration > 0 ? (status.currentTime / status.duration) * 100 : 0;
-
-  useEffect(() => {
-    if (playingJokeId !== joke.id && status.playing) {
-      console.log('[JokeCard] Pausing because another joke is playing:', playingJokeId);
-      player.pause();
-    }
-  }, [playingJokeId, joke.id, status.playing, player]);
-
-  useEffect(() => {
-    if (status.didJustFinish) {
-      console.log('[JokeCard] Audio finished for joke:', joke.id);
-      setPlayingJokeId(null);
-    }
-  }, [status.didJustFinish, joke.id, setPlayingJokeId]);
-
+  // This card is the one currently playing
   const isThisJokePlaying = playingJokeId === joke.id;
-  const isActive = isThisJokePlaying || status.playing;
+  const isActive = isThisJokePlaying && globalAudioStatus.playing;
+
+  // Progress only shown for the active card
+  const progressPercent = isThisJokePlaying && globalAudioStatus.duration > 0
+    ? (globalAudioStatus.currentTime / globalAudioStatus.duration) * 100
+    : 0;
 
   const handlePlay = useCallback(() => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-    console.log('[JokeCard] handlePlay called, isThisJokePlaying:', isThisJokePlaying, 'status.playing:', status.playing, 'joke:', joke.id);
-
-    if (isThisJokePlaying || status.playing) {
-      console.log('[JokeCard] Stopping joke:', joke.id);
-      try { player.pause(); } catch (e) { console.log('[JokeCard] pause error:', e); }
-      setPlayingJokeId(null);
+    if (isThisJokePlaying && globalAudioStatus.playing) {
+      pauseAudio();
     } else {
-      console.log('[JokeCard] Playing joke:', joke.id, 'audioUri:', joke.audioUri);
-      setPlayingJokeId(joke.id);
-      if (player.currentTime >= player.duration && player.duration > 0) {
-        void player.seekTo(0);
-      }
-      player.play();
-    }
-    if (!isThisJokePlaying && !status.playing) {
+      playJoke(joke);
       incrementListenCount();
     }
     onPlay?.();
-  }, [player, joke.id, joke.audioUri, onPlay, setPlayingJokeId, isThisJokePlaying, status.playing, incrementListenCount]);
+  }, [isThisJokePlaying, globalAudioStatus.playing, playJoke, pauseAudio, joke, onPlay, incrementListenCount]);
 
   const handleReaction = useCallback((emoji: ReactionEmoji) => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -203,18 +188,18 @@ export default React.memo(function JokeCard({ joke, onPlay, compact }: JokeCardP
             <View style={styles.durationBadge}>
               <Clock size={10} color={Colors.textMuted} />
               <Text style={styles.durationText}>
-                {status.playing || status.currentTime > 0
-                  ? `${formatDuration(status.currentTime)} / ${formatDuration(status.duration || joke.duration)}`
+                {isThisJokePlaying && globalAudioStatus.currentTime > 0
+                  ? `${formatDuration(globalAudioStatus.currentTime)} / ${formatDuration(globalAudioStatus.duration || joke.duration)}`
                   : formatDuration(joke.duration)}
               </Text>
             </View>
-            {status.playing && (
+            {isActive && (
               <View style={styles.liveIndicator}>
                 <Volume2 size={12} color={Colors.primary} />
                 <Text style={styles.liveText}>{t('jokeCard.playing')}</Text>
               </View>
             )}
-            {status.isBuffering && !status.playing && (
+            {isThisJokePlaying && globalAudioStatus.isBuffering && !globalAudioStatus.playing && (
               <View style={styles.liveIndicator}>
                 <Text style={styles.liveText}>{t('jokeCard.buffering')}</Text>
               </View>
