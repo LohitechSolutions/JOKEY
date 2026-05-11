@@ -1,40 +1,8 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 import { User, Joke, ReactionEmoji } from '@/types';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
-const b64chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-const b64lookup = new Uint8Array(256);
-b64lookup.fill(255);
-for (let i = 0; i < b64chars.length; i++) {
-  b64lookup[b64chars.charCodeAt(i)] = i;
-}
 
-function decodeBase64ToArrayBuffer(base64: string): ArrayBuffer {
-  // Remove padding for length calculation
-  const cleanBase64 = base64.replace(/=+$/, '');
-  const bufferLength = Math.floor(cleanBase64.length * 0.75);
-  
-  const arraybuffer = new ArrayBuffer(bufferLength);
-  const bytes = new Uint8Array(arraybuffer);
-
-  let p = 0;
-  for (let i = 0; i < cleanBase64.length; i += 4) {
-    const encoded1 = b64lookup[cleanBase64.charCodeAt(i)];
-    const encoded2 = b64lookup[cleanBase64.charCodeAt(i + 1)];
-    const encoded3 = i + 2 < cleanBase64.length ? b64lookup[cleanBase64.charCodeAt(i + 2)] : 0;
-    const encoded4 = i + 3 < cleanBase64.length ? b64lookup[cleanBase64.charCodeAt(i + 3)] : 0;
-
-    bytes[p++] = (encoded1 << 2) | (encoded2 >> 4);
-    if (p < bufferLength) {
-      bytes[p++] = ((encoded2 & 15) << 4) | (encoded3 >> 2);
-    }
-    if (p < bufferLength) {
-      bytes[p++] = ((encoded3 & 3) << 6) | (encoded4 & 63);
-    }
-  }
-
-  return arraybuffer;
-}
 
 
 export function isClientDBAvailable(): boolean {
@@ -243,13 +211,13 @@ export async function uploadAudioToSupabase(localUri: string, jokeId: string): P
     const filePath = `jokes/${fileName}`;
 
     // Fix for React Native + Supabase 0-byte file upload bug on BOTH Android and iOS
-    // Read the file as Base64, then use custom robust decoder to get ArrayBuffer
-    const base64 = await FileSystem.readAsStringAsync(localUri, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
-    
-    // Avoids fetch() data URI limits on Android and missing atob()
-    const arrayBuffer = decodeBase64ToArrayBuffer(base64);
+    // We use fetch() on the local file URI to get an ArrayBuffer directly.
+    // This is the fastest and most reliable way in modern Expo/React Native.
+    const response = await fetch(localUri);
+    if (!response.ok) {
+      throw new Error(`Failed to read local file: ${response.statusText}`);
+    }
+    const arrayBuffer = await response.arrayBuffer();
 
     console.log('[DB] Uploading ArrayBuffer of size:', arrayBuffer.byteLength);
 

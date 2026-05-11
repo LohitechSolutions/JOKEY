@@ -765,14 +765,12 @@ export const [AppProvider, useApp] = createContextHook(() => {
     }
   }, [globalAudioStatus.isLoaded, globalAudioStatus.playing, globalPlayer]);
 
-  // Add error handling for audio loading failures
+  // Cleanup on unmount
   useEffect(() => {
-    if (globalAudioStatus.error) {
-      console.error('[Audio] Player error:', globalAudioStatus.error);
-      pendingPlay.current = false;
-      setPlayingJokeId(null);
-    }
-  }, [globalAudioStatus.error]);
+    return () => {
+      if (playbackIntervalRef.current) clearInterval(playbackIntervalRef.current);
+    };
+  }, []);
 
   const playJoke = useCallback((joke: Joke) => {
     if (!joke.audioUri) {
@@ -831,10 +829,6 @@ export const [AppProvider, useApp] = createContextHook(() => {
             console.error('[Audio] Fallback play error:', err);
             setPlayingJokeId(null);
           }
-        } else if (globalPlayer.currentStatus?.error) {
-          console.error('[Audio] Fallback detected load error:', globalPlayer.currentStatus.error);
-          pendingPlay.current = false;
-          setPlayingJokeId(null);
         }
       }
     }, 1000);
