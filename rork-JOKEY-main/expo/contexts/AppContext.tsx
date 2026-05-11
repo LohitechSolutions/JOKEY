@@ -54,11 +54,10 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const [tipsBalance, setTipsBalance] = useState<Record<string, number>>({});
   const [dbReady, setDbReady] = useState<boolean>(false);
 
-  // ─── Single global audio player ───────────────────────────────────────────
   const globalPlayer = useAudioPlayer(null);
   const globalAudioStatus = useAudioPlayerStatus(globalPlayer);
-  // Tracks whether we are waiting for audio to load before playing
   const pendingPlay = useRef(false);
+  const seenUnloaded = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -744,31 +743,56 @@ export const [AppProvider, useApp] = createContextHook(() => {
 
   // When audio becomes loaded AND we have a pending play request → start playing
   useEffect(() => {
-    if (pendingPlay.current && globalAudioStatus.isLoaded && !globalAudioStatus.playing) {
-      console.log('[Audio] Source loaded — starting playback now');
-      pendingPlay.current = false;
-      globalPlayer.volume = 1.0;
-      globalPlayer.play();
+    if (pendingPlay.current) {
+      if (!globalAudioStatus.isLoaded) {
+        seenUnloaded.current = true;
+      }
+      
+      if (globalAudioStatus.isLoaded && !globalAudioStatus.playing && seenUnloaded.current) {
+        console.log('[Audio] Source loaded — starting playback now');
+        pendingPlay.current = false;
+        globalPlayer.volume = 1.0;
+        globalPlayer.play();
+      }
     }
   }, [globalAudioStatus.isLoaded, globalAudioStatus.playing, globalPlayer]);
+
 
   const playJoke = useCallback((joke: Joke) => {
     if (!joke.audioUri) {
       console.log('[Audio] No audioUri for joke:', joke.id);
       return;
     }
+    
+    // If it's already the current joke, just resume playing
+    if (playingJokeId === joke.id) {
+      console.log('[Audio] Resuming current joke:', joke.id);
+      globalPlayer.play();
+      return;
+    }
+
     console.log('[Audio] Loading joke:', joke.id, 'uri:', joke.audioUri);
     setPlayingJokeId(joke.id);
+    
+    seenUnloaded.current = false;
     pendingPlay.current = true;
-    // replace() loads the new source; play() will be triggered once isLoaded becomes true
     globalPlayer.replace({ uri: joke.audioUri });
-  }, [globalPlayer]);
+
+    // Fallback: if it's a fast local load and isLoaded never becomes false
+    setTimeout(() => {
+      seenUnloaded.current = true;
+      if (pendingPlay.current && globalPlayer.currentStatus?.isLoaded) {
+        console.log('[Audio] Fallback play trigger');
+        pendingPlay.current = false;
+        globalPlayer.play();
+      }
+    }, 500);
+  }, [globalPlayer, playingJokeId]);
 
   const pauseAudio = useCallback(() => {
     console.log('[Audio] Pausing');
     pendingPlay.current = false;
     globalPlayer.pause();
-    setPlayingJokeId(null);
   }, [globalPlayer]);
 
   return useMemo(() => ({

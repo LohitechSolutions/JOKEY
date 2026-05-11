@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 import { User, Joke, ReactionEmoji } from '@/types';
+import * as FileSystem from 'expo-file-system';
 
 
 export function isClientDBAvailable(): boolean {
@@ -207,22 +208,22 @@ export async function uploadAudioToSupabase(localUri: string, jokeId: string): P
     const fileName = `${jokeId}_${Date.now()}.m4a`;
     const filePath = `jokes/${fileName}`;
 
-    const response = await fetch(localUri);
-    if (!response.ok) {
-      console.error('[DB] Failed to fetch local audio file, status:', response.status);
-      throw new Error('Failed to read audio file');
-    }
-    const blob = await response.blob();
-    console.log('[DB] Audio blob size:', blob.size, 'type:', blob.type);
+    // Fix for React Native + Supabase 0-byte file upload bug
+    // Read the file as Base64, then use fetch with a data URI to get a clean ArrayBuffer
+    const base64 = await FileSystem.readAsStringAsync(localUri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    
+    // Use data URI to get an ArrayBuffer natively, avoiding atob issues
+    const response = await fetch(`data:audio/x-m4a;base64,${base64}`);
+    const arrayBuffer = await response.arrayBuffer();
 
-    if (blob.size === 0) {
-      throw new Error('Audio file is empty');
-    }
+    console.log('[DB] Uploading ArrayBuffer of size:', arrayBuffer.byteLength);
 
     const { data, error } = await supabase.storage
       .from('audio')
-      .upload(filePath, blob, {
-        contentType: 'audio/mp4',
+      .upload(filePath, arrayBuffer, {
+        contentType: 'audio/x-m4a',
         upsert: true,
       });
 
