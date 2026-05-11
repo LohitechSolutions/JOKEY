@@ -4,6 +4,7 @@ import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import { View, ActivityIndicator, StyleSheet } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { setAudioModeAsync } from "expo-audio";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AppProvider, useApp } from "@/contexts/AppContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -78,6 +79,15 @@ const loadingStyles = StyleSheet.create({
 export default function RootLayout() {
   useEffect(() => {
     void SplashScreen.hideAsync();
+    
+    // Ensure Android (and iOS) routes audio through the main speaker, not the earpiece,
+    // and properly plays media even if the hardware switch is on silent.
+    void setAudioModeAsync({
+      playsInSilentMode: true,
+      allowsRecording: false,
+      shouldRouteThroughEarpiece: false,
+      interruptionMode: 'mixWithOthers',
+    });
   }, []);
 
   return (

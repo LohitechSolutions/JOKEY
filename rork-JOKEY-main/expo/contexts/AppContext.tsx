@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import createContextHook from '@nkzw/create-context-hook';
+import { Platform } from 'react-native';
 import { User, Joke, ReactionEmoji, SubscriptionPlan } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { setCachedUser, getCachedUser } from '@/lib/auth-storage';
@@ -69,6 +70,8 @@ export const [AppProvider, useApp] = createContextHook(() => {
         await setAudioModeAsync({
           playsInSilentMode: true,
           allowsRecording: false,
+          shouldRouteThroughEarpiece: false,
+          interruptionMode: 'mixWithOthers',
         }).catch(err => console.log('[AppContext] Audio mode error:', err));
 
         const ok = await ensureDBReady();
@@ -749,14 +752,27 @@ export const [AppProvider, useApp] = createContextHook(() => {
       }
       
       if (globalAudioStatus.isLoaded && !globalAudioStatus.playing && seenUnloaded.current) {
-        console.log('[Audio] Source loaded — starting playback now');
+        console.log('[Audio] Source loaded — starting playback now. Player ID:', globalPlayer.id, 'Loaded:', globalAudioStatus.isLoaded);
         pendingPlay.current = false;
         globalPlayer.volume = 1.0;
-        globalPlayer.play();
+        console.log('[Audio] Setting volume to 1.0 and calling play()');
+        try {
+          globalPlayer.play();
+        } catch (err) {
+          console.error('[Audio] Play error:', err);
+        }
       }
     }
   }, [globalAudioStatus.isLoaded, globalAudioStatus.playing, globalPlayer]);
 
+  // Add error handling for audio loading failures
+  useEffect(() => {
+    if (globalAudioStatus.error) {
+      console.error('[Audio] Player error:', globalAudioStatus.error);
+      pendingPlay.current = false;
+      setPlayingJokeId(null);
+    }
+  }, [globalAudioStatus.error]);
 
   const playJoke = useCallback((joke: Joke) => {
     if (!joke.audioUri) {
@@ -767,7 +783,11 @@ export const [AppProvider, useApp] = createContextHook(() => {
     // If it's already the current joke, just resume playing
     if (playingJokeId === joke.id) {
       console.log('[Audio] Resuming current joke:', joke.id);
-      globalPlayer.play();
+      try {
+        globalPlayer.play();
+      } catch (err) {
+        console.error('[Audio] Resume play error:', err);
+      }
       return;
     }
 
@@ -776,17 +796,50 @@ export const [AppProvider, useApp] = createContextHook(() => {
     
     seenUnloaded.current = false;
     pendingPlay.current = true;
-    globalPlayer.replace({ uri: joke.audioUri });
+    
+    // On Android, ensure audio mode is set properly for playback before loading
+    if (Platform.OS === 'android') {
+      setAudioModeAsync({
+        playsInSilentMode: true,
+        allowsRecording: false,
+        shouldRouteThroughEarpiece: false,
+        interruptionMode: 'mixWithOthers',
+      }).catch(err => console.log('[Audio] Android audio mode setup error:', err));
+    }
+    
+    try {
+      globalPlayer.replace({ uri: joke.audioUri });
+    } catch (err) {
+      console.error('[Audio] Replace error:', err);
+      pendingPlay.current = false;
+      setPlayingJokeId(null);
+      return;
+    }
 
     // Fallback: if it's a fast local load and isLoaded never becomes false
-    setTimeout(() => {
-      seenUnloaded.current = true;
-      if (pendingPlay.current && globalPlayer.currentStatus?.isLoaded) {
-        console.log('[Audio] Fallback play trigger');
-        pendingPlay.current = false;
-        globalPlayer.play();
+    const timeoutId = setTimeout(() => {
+      if (pendingPlay.current) {
+        console.log('[Audio] Fallback check after 1000ms. isLoaded:', globalPlayer.currentStatus?.isLoaded);
+        seenUnloaded.current = true;
+        if (globalPlayer.currentStatus?.isLoaded) {
+          console.log('[Audio] Fallback play trigger executed');
+          pendingPlay.current = false;
+          try {
+            globalPlayer.volume = 1.0;
+            globalPlayer.play();
+          } catch (err) {
+            console.error('[Audio] Fallback play error:', err);
+            setPlayingJokeId(null);
+          }
+        } else if (globalPlayer.currentStatus?.error) {
+          console.error('[Audio] Fallback detected load error:', globalPlayer.currentStatus.error);
+          pendingPlay.current = false;
+          setPlayingJokeId(null);
+        }
       }
-    }, 500);
+    }, 1000);
+
+    return () => clearTimeout(timeoutId);
   }, [globalPlayer, playingJokeId]);
 
   const pauseAudio = useCallback(() => {

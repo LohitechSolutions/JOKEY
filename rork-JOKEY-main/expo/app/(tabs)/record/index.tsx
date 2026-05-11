@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Mic, Square, RotateCcw, Send, ChevronDown, Loader, Play, Pause } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
+import * as FileSystem from 'expo-file-system';
 import {
   useAudioRecorder,
   useAudioRecorderState,
@@ -50,6 +51,14 @@ export default function RecordScreen() {
   const previewPlayer = useAudioPlayer(previewSource);
   const previewStatus = useAudioPlayerStatus(previewPlayer);
 
+  // Monitor preview player errors
+  useEffect(() => {
+    if (previewStatus.error) {
+      console.error('[Record] Preview player error:', previewStatus.error);
+      Alert.alert(t('record.playbackError'), `${t('record.errorMsg')}: ${previewStatus.error}`);
+    }
+  }, [previewStatus.error, t]);
+
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const progressAnim = useRef(new Animated.Value(0)).current;
 
@@ -79,12 +88,47 @@ export default function RecordScreen() {
     try {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       await audioRecorder.stop();
-      await setAudioModeAsync({
-        playsInSilentMode: true,
-        allowsRecording: false,
-      });
+      
+      // For Android, ensure audio mode is configured for playback after recording
+      if (Platform.OS === 'android') {
+        await setAudioModeAsync({
+          playsInSilentMode: true,
+          allowsRecording: false,
+          shouldRouteThroughEarpiece: false,
+          interruptionMode: 'mixWithOthers',
+        }).catch(err => console.log('[Record] Android audio mode error:', err));
+      } else {
+        await setAudioModeAsync({
+          playsInSilentMode: true,
+          allowsRecording: false,
+          shouldRouteThroughEarpiece: false,
+          interruptionMode: 'mixWithOthers',
+        });
+      }
+      
       const uri = audioRecorder.uri;
       console.log('[Record] Recording stopped, uri:', uri);
+      
+      // Validate the recorded file exists and has content (Android specific validation)
+      if (Platform.OS === 'android' && uri) {
+        try {
+          const fileInfo = await FileSystem.getInfoAsync(uri);
+          console.log('[Record] Android - Recording file info:', { 
+            exists: fileInfo.exists, 
+            size: fileInfo.size,
+            isDirectory: fileInfo.isDirectory 
+          });
+          if (!fileInfo.exists || (fileInfo.size && fileInfo.size < 1000)) {
+            console.warn('[Record] Android - Recording file is empty or missing');
+            Alert.alert(t('record.error'), 'Recording file is empty. Please try again.');
+            setHasRecording(false);
+            return;
+          }
+        } catch (err) {
+          console.log('[Record] Error checking file info:', err);
+        }
+      }
+      
       setRecordedUri(uri);
       setHasRecording(true);
       setRecordingDuration(Math.floor(recorderState.durationMillis / 1000));
@@ -92,7 +136,7 @@ export default function RecordScreen() {
       console.error('[Record] Stop error:', error);
       setHasRecording(false);
     }
-  }, [audioRecorder, recorderState.durationMillis]);
+  }, [audioRecorder, recorderState.durationMillis, t]);
 
   const stopRecordingRef = useRef(stopRecording);
   stopRecordingRef.current = stopRecording;
@@ -296,13 +340,27 @@ export default function RecordScreen() {
           {hasRecording && !isRecording && (
             <TouchableOpacity 
               style={[styles.secondaryBtn, { backgroundColor: Colors.primary + '20', borderColor: Colors.primary }]} 
-              onPress={() => {
+              onPress={async () => {
                 if (previewStatus.playing) {
                   previewPlayer.pause();
                 } else {
-                  previewPlayer.volume = 1.0;
-                  try { previewPlayer.seekTo(0); } catch (e) { console.log('[Record] seekTo error:', e); }
-                  previewPlayer.play();
+                  try {
+                    // Ensure audio mode is set for playback on Android
+                    if (Platform.OS === 'android') {
+                      await setAudioModeAsync({
+                        playsInSilentMode: true,
+                        allowsRecording: false,
+                        shouldRouteThroughEarpiece: false,
+                        interruptionMode: 'mixWithOthers',
+                      });
+                    }
+                    previewPlayer.volume = 1.0;
+                    try { previewPlayer.seekTo(0); } catch (e) { console.log('[Record] seekTo error:', e); }
+                    previewPlayer.play();
+                  } catch (err) {
+                    console.error('[Record] Preview play error:', err);
+                    Alert.alert(t('record.error'), t('record.playbackError'));
+                  }
                 }
               }}
             >
