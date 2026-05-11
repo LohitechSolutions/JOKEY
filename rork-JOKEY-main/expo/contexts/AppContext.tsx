@@ -795,13 +795,14 @@ export const [AppProvider, useApp] = createContextHook(() => {
     seenUnloaded.current = false;
     pendingPlay.current = true;
     
-    // On Android, ensure audio mode is set properly for playback before loading
+    // On Android, ensure audio mode is set properly for playback before loading.
+    // Use 'doNotMix' to force the system to give us exclusive audio focus and full volume.
     if (Platform.OS === 'android') {
       setAudioModeAsync({
         playsInSilentMode: true,
         allowsRecording: false,
         shouldRouteThroughEarpiece: false,
-        interruptionMode: 'mixWithOthers',
+        interruptionMode: 'doNotMix',
       }).catch(err => console.log('[Audio] Android audio mode setup error:', err));
     }
     

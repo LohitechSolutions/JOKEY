@@ -31,6 +31,22 @@ import { createJokeInDB, uploadAudioToSupabase } from '@/lib/db-client';
 
 const MAX_DURATION = 180;
 
+// High compatibility preset for Android/iOS: Mono (1 channel) is much safer for various hardware
+const SAFE_RECORDING_PRESET = {
+  extension: '.m4a',
+  sampleRate: 44100,
+  numberOfChannels: 1, 
+  bitRate: 128000,
+  android: {
+    outputFormat: 'mpeg4',
+    audioEncoder: 'aac',
+  },
+  ios: {
+    outputFormat: 'aac ', // IOSOutputFormat.MPEG4AAC
+    audioQuality: 0x7f, // AudioQuality.MAX
+  },
+} as any;
+
 export default function RecordScreen() {
   const { addJoke, currentUser, incrementCreateCount } = useApp();
   const { t } = useLanguage();
@@ -44,7 +60,7 @@ export default function RecordScreen() {
   const [level, setLevel] = useState<'all' | 'adult'>('all');
   const [permissionGranted, setPermissionGranted] = useState(false);
 
-  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const audioRecorder = useAudioRecorder(SAFE_RECORDING_PRESET);
   const recorderState = useAudioRecorderState(audioRecorder, 500);
 
   const previewSource = useMemo(() => recordedUri ? { uri: recordedUri } : null, [recordedUri]);
@@ -89,14 +105,15 @@ export default function RecordScreen() {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       await audioRecorder.stop();
       
-      // For Android, ensure audio mode is configured for playback after recording
+      // On Android, ensure audio mode is set properly for playback before loading.
+      // Use 'doNotMix' to force the system to give us exclusive audio focus and full volume.
       if (Platform.OS === 'android') {
-        await setAudioModeAsync({
+        setAudioModeAsync({
           playsInSilentMode: true,
           allowsRecording: false,
           shouldRouteThroughEarpiece: false,
-          interruptionMode: 'mixWithOthers',
-        }).catch(err => console.log('[Record] Android audio mode error:', err));
+          interruptionMode: 'doNotMix',
+        }).catch(err => console.log('[Audio] Android audio mode setup error:', err));
       } else {
         await setAudioModeAsync({
           playsInSilentMode: true,
@@ -180,8 +197,8 @@ export default function RecordScreen() {
       setRecordingDuration(0);
       progressAnim.setValue(0);
 
-      console.log('[Record] Preparing to record...');
-      await audioRecorder.prepareToRecordAsync();
+      console.log('[Record] Preparing to record with safe mono preset...');
+      await audioRecorder.prepareToRecordAsync(SAFE_RECORDING_PRESET);
       audioRecorder.record();
       console.log('[Record] Recording started');
     } catch (error) {
