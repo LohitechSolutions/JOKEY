@@ -254,6 +254,75 @@ export async function uploadAudioToSupabase(localUri: string, jokeId: string): P
   }
 }
 
+export async function uploadAvatarToSupabase(localUri: string, userId: string): Promise<string> {
+  console.log('[DB] Uploading avatar...', localUri);
+
+  try {
+    const response = await fetch(localUri);
+    if (!response.ok) {
+      throw new Error(`Failed to read image: ${response.statusText}`);
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    if (arrayBuffer.byteLength === 0) {
+      throw new Error('Image file is empty');
+    }
+
+    const uriLower = localUri.toLowerCase();
+    let ext = 'jpg';
+    let contentType = 'image/jpeg';
+    if (uriLower.includes('.png')) {
+      ext = 'png';
+      contentType = 'image/png';
+    } else if (uriLower.includes('.webp')) {
+      ext = 'webp';
+      contentType = 'image/webp';
+    }
+
+    const filePath = `avatars/${userId}_${Date.now()}.${ext}`;
+
+    const { error } = await supabase.storage.from('audio').upload(filePath, arrayBuffer, {
+      contentType,
+      upsert: true,
+      duplex: 'half',
+    });
+
+    if (error) {
+      console.error('[DB] Avatar upload error:', error.message);
+      throw new Error(error.message);
+    }
+
+    const { data: publicUrlData } = supabase.storage.from('audio').getPublicUrl(filePath);
+    if (!publicUrlData.publicUrl) {
+      throw new Error('Failed to generate public URL for avatar');
+    }
+    return publicUrlData.publicUrl;
+  } catch (err: any) {
+    console.error('[DB] uploadAvatar exception:', err?.message);
+    throw err;
+  }
+}
+
+export type UserProfilePatch = {
+  avatar?: string;
+  display_name?: string;
+  bio?: string;
+  language?: string;
+};
+
+export async function updateUserProfileInDB(userId: string, patch: UserProfilePatch): Promise<void> {
+  if (!isClientDBAvailable()) {
+    throw new Error('Base de données non disponible');
+  }
+  const entries = Object.entries(patch).filter(([, v]) => v !== undefined);
+  if (entries.length === 0) return;
+
+  const { error } = await supabase.from('users').update(Object.fromEntries(entries as [string, string][])).eq('id', userId);
+  if (error) {
+    console.error('[DB] updateUserProfile error:', error.message);
+    throw new Error(error.message);
+  }
+}
+
 export async function createJokeInDB(joke: {
   id: string;
   userId: string;

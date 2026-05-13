@@ -20,7 +20,17 @@ import { useRouter } from 'expo-router';
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { currentUser, jokes, logout, deleteAccount, deleteJoke } = useApp();
+  const {
+    currentUser,
+    jokes,
+    logout,
+    deleteAccount,
+    deleteJoke,
+    authChecked,
+    isLoading,
+    updateProfile,
+    isUpdatingProfile,
+  } = useApp();
   const { t } = useLanguage();
   const [localAvatar, setLocalAvatar] = useState<string | null>(null);
 
@@ -61,13 +71,24 @@ export default function ProfileScreen() {
         quality: 0.8,
       });
       if (!result.canceled && result.assets[0]) {
-        console.log('[Profile] New avatar selected:', result.assets[0].uri);
-        setLocalAvatar(result.assets[0].uri);
+        const uri = result.assets[0].uri;
+        console.log('[Profile] New avatar selected:', uri);
+        setLocalAvatar(uri);
+        try {
+          await updateProfile({ localAvatarUri: uri });
+          setLocalAvatar(null);
+        } catch (err: any) {
+          setLocalAvatar(null);
+          Alert.alert(
+            t('auth.error'),
+            err?.message || 'Impossible de mettre à jour la photo de profil.',
+          );
+        }
       }
     } catch (err) {
       console.log('[Profile] Image picker error:', err);
     }
-  }, []);
+  }, [updateProfile, t]);
 
   const handleLogout = () => {
     Alert.alert(
@@ -105,8 +126,6 @@ export default function ProfileScreen() {
     );
   };
 
-  const { authChecked, isLoading } = useApp();
-
   if (!authChecked || isLoading) {
     return (
       <View style={styles.container}>
@@ -143,11 +162,15 @@ export default function ProfileScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.profileHeader}>
         <View style={styles.avatarSection}>
-          <TouchableOpacity onPress={handlePickImage} activeOpacity={0.8}>
+          <TouchableOpacity onPress={handlePickImage} activeOpacity={0.8} disabled={isUpdatingProfile}>
             <View style={styles.avatarWrapper}>
               <Image source={{ uri: avatarUri }} style={styles.avatar} />
               <View style={styles.cameraOverlay}>
-                <Camera size={16} color={Colors.white} />
+                {isUpdatingProfile ? (
+                  <ActivityIndicator size="small" color={Colors.white} />
+                ) : (
+                  <Camera size={16} color={Colors.white} />
+                )}
               </View>
             </View>
           </TouchableOpacity>

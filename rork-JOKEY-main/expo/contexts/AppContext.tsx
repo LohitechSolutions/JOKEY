@@ -7,7 +7,7 @@ import { User, Joke, ReactionEmoji, SubscriptionPlan } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { setCachedUser, getCachedUser } from '@/lib/auth-storage';
 import { clientRegister, clientLogin, clientDeleteAccount, clientRequestPasswordReset, clientConfirmPasswordReset, signOutSupabase, clientGetMe } from '@/lib/auth-client';
-import { ensureDBReady, fetchJokesFromDB, toggleReactionInDB, rateJokeInDB, toggleFollowInDB, deleteJokeFromDB, ensureUserRecordExists } from '@/lib/db-client';
+import { ensureDBReady, fetchJokesFromDB, toggleReactionInDB, rateJokeInDB, toggleFollowInDB, deleteJokeFromDB, ensureUserRecordExists, uploadAvatarToSupabase, updateUserProfileInDB } from '@/lib/db-client';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 
@@ -72,6 +72,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
           allowsRecording: false,
           shouldRouteThroughEarpiece: false,
           interruptionMode: 'mixWithOthers',
+          shouldPlayInBackground: true,
         }).catch(err => console.log('[AppContext] Audio mode error:', err));
 
         const ok = await ensureDBReady();
@@ -375,6 +376,74 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const confirmPasswordReset = useCallback(
     (input: { email: string; code: string; newPassword: string }) => confirmPasswordResetMutation.mutateAsync(input),
     [confirmPasswordResetMutation]
+  );
+
+  const updateProfileMutation = useMutation({
+    mutationFn: async (input: {
+      user: User;
+      localAvatarUri?: string;
+      displayName?: string;
+      bio?: string;
+      language?: string;
+    }) => {
+      const { user, localAvatarUri, displayName, bio, language } = input;
+
+      if (!isSupabaseConfigured) {
+        const next: User = {
+          ...user,
+          ...(localAvatarUri ? { avatar: localAvatarUri } : {}),
+          ...(displayName !== undefined ? { displayName } : {}),
+          ...(bio !== undefined ? { bio } : {}),
+          ...(language !== undefined ? { language } : {}),
+        };
+        return next;
+      }
+
+      await ensureUserRecordExists(user);
+
+      let avatarUrl: string | undefined;
+      if (localAvatarUri) {
+        avatarUrl = await uploadAvatarToSupabase(localAvatarUri, user.id);
+      }
+
+      const patch: Parameters<typeof updateUserProfileInDB>[1] = {};
+      if (avatarUrl) patch.avatar = avatarUrl;
+      if (displayName !== undefined) patch.display_name = displayName;
+      if (bio !== undefined) patch.bio = bio;
+      if (language !== undefined) patch.language = language;
+
+      if (Object.keys(patch).length > 0) {
+        await updateUserProfileInDB(user.id, patch);
+      }
+
+      const refreshed = await clientGetMe(user.id);
+      if (!refreshed) {
+        throw new Error('Impossible de recharger le profil');
+      }
+      return refreshed;
+    },
+    onSuccess: async (user) => {
+      await setCachedUser(user);
+      setCurrentUser(user);
+      setJokes(prev => prev.map(j =>
+        j.userId === user.id
+          ? { ...j, user: { ...j.user, avatar: user.avatar, displayName: user.displayName, bio: user.bio, language: user.language } }
+          : j
+      ));
+    },
+    onError: (error: Error) => {
+      console.error('[AppContext] updateProfile error:', error.message);
+    },
+  });
+
+  const updateProfile = useCallback(
+    (input: { localAvatarUri?: string; displayName?: string; bio?: string; language?: string }) => {
+      if (!currentUser) {
+        return Promise.reject(new Error('Non authentifié'));
+      }
+      return updateProfileMutation.mutateAsync({ user: currentUser, ...input });
+    },
+    [currentUser, updateProfileMutation]
   );
 
   const deleteMutation = useMutation({
@@ -803,6 +872,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
         allowsRecording: false,
         shouldRouteThroughEarpiece: false,
         interruptionMode: 'doNotMix',
+        shouldPlayInBackground: true,
       }).catch(err => console.log('[Audio] Android audio mode setup error:', err));
     }
     
@@ -859,6 +929,8 @@ export const [AppProvider, useApp] = createContextHook(() => {
     register,
     logout,
     deleteAccount,
+    updateProfile,
+    isUpdatingProfile: updateProfileMutation.isPending,
     toggleFollow,
     addReaction,
     rateJoke,
@@ -900,7 +972,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
   }), [
     currentUser, isAuthenticated, authChecked, authError, jokes, followingIds,
     playingJokeId, playJoke, pauseAudio, globalAudioStatus,
-    login, register, logout, deleteAccount, toggleFollow,
+    login, register, logout, deleteAccount, updateProfile, updateProfileMutation.isPending, toggleFollow,
     addReaction, rateJoke, addJoke, deleteJoke, deleteJokeMutation.isPending, isFollowing, getJokeReactions, getMyRating,
     totalReactions, isSubscribed, subscriptionPlan, subscribe,
     listenCount, createCount, incrementListenCount, incrementCreateCount,

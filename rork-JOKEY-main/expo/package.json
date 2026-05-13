@@ -1,16 +1,16 @@
 {
   "name": "jokey",
   "main": "expo-router/entry",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "scripts": {
     "start": "bunx rork start -p azbb4413e811lknfmyslw --tunnel",
     "start-web": "bunx rork start -p azbb4413e811lknfmyslw --web --tunnel",
     "start-web-dev": "DEBUG=expo* bunx rork start -p azbb4413e811lknfmyslw --web --tunnel",
     "lint": "expo lint",
     "android": "expo run:android",
-    "build:apk-debug": "expo prebuild --platform android && cd android && ./gradlew assembleDebug",
-    "build:apk-release": "expo prebuild --platform android && cd android && ./gradlew assembleRelease",
-    "build:aab": "expo prebuild --platform android && cd android && ./gradlew bundleRelease",
+    "build:apk-debug": "NODE_ENV=production expo prebuild --platform android && cd android && ./gradlew assembleDebug",
+    "build:apk-release": "NODE_ENV=production expo prebuild --platform android && cd android && ./gradlew assembleRelease",
+    "build:aab": "NODE_ENV=production expo prebuild --platform android && cd android && ./gradlew bundleRelease",
     "ios": "expo run:ios"
   },
   "dependencies": {
