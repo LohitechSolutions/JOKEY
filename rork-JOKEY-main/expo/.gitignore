@@ -15,6 +15,7 @@ android/
 *.orig.*
 *.jks
 credentials/upload-keystore-password.txt
+credentials/keystore.properties
 *.p8
 *.p12
 *.key

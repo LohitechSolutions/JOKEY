@@ -20,7 +20,17 @@ import { useRouter } from 'expo-router';
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { currentUser, jokes, logout, deleteAccount, deleteJoke, updateProfile, isUpdatingProfile } = useApp();
+  const {
+    currentUser,
+    jokes,
+    logout,
+    deleteAccount,
+    deleteJoke,
+    authChecked,
+    isLoading,
+    updateProfile,
+    isUpdatingProfile,
+  } = useApp();
   const { t } = useLanguage();
 
   const myJokes = useMemo(() => {
@@ -65,11 +75,11 @@ export default function ProfileScreen() {
         try {
           await updateProfile({ localAvatarUri: selectedUri });
           console.log('[Profile] Avatar updated successfully');
-        } catch (updateErr) {
+        } catch (updateErr: any) {
           console.error('[Profile] Failed to update avatar:', updateErr);
           Alert.alert(
             t('profile.uploadError') || 'Erreur',
-            t('profile.uploadErrorMessage') || 'Impossible de mettre à jour l\'avatar. Veuillez réessayer.'
+            updateErr?.message || t('profile.uploadErrorMessage') || 'Impossible de mettre à jour l\'avatar. Veuillez réessayer.'
           );
         }
       }
@@ -118,8 +128,6 @@ export default function ProfileScreen() {
     );
   };
 
-  const { authChecked, isLoading } = useApp();
-
   if (!authChecked || isLoading) {
     return (
       <View style={styles.container}>
@@ -156,7 +164,7 @@ export default function ProfileScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.profileHeader}>
         <View style={styles.avatarSection}>
-          <TouchableOpacity onPress={handlePickImage} activeOpacity={0.8}>
+          <TouchableOpacity onPress={handlePickImage} activeOpacity={0.8} disabled={isUpdatingProfile}>
             <View style={styles.avatarWrapper}>
               <Image source={{ uri: avatarUri }} style={[styles.avatar, isUpdatingProfile && { opacity: 0.5 }]} />
               {isUpdatingProfile ? (

@@ -43,7 +43,7 @@ function formatDuration(seconds: number): string {
 
 export default function RankingScreen() {
   const router = useRouter();
-  const { jokes, playingJokeId, setPlayingJokeId, rateJoke, getMyRating } = useApp();
+  const { jokes, playingJokeId, playJoke, pauseAudio, globalAudioStatus, rateJoke, getMyRating } = useApp();
   const { t } = useLanguage();
 
   const rankedJokes = useMemo(() => {
@@ -52,14 +52,19 @@ export default function RankingScreen() {
       .slice(0, 100);
   }, [jokes]);
 
-  const handlePlay = useCallback((jokeId: string) => {
+  const isJokeActive = useCallback(
+    (jokeId: string) => playingJokeId === jokeId && globalAudioStatus.playing,
+    [playingJokeId, globalAudioStatus.playing]
+  );
+
+  const handlePlay = useCallback((joke: Joke) => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (playingJokeId === jokeId) {
-      setPlayingJokeId(null);
+    if (playingJokeId === joke.id && globalAudioStatus.playing) {
+      pauseAudio();
     } else {
-      setPlayingJokeId(jokeId);
+      playJoke(joke);
     }
-  }, [playingJokeId, setPlayingJokeId]);
+  }, [playingJokeId, globalAudioStatus.playing, playJoke, pauseAudio]);
 
   const handleRate = useCallback((jokeId: string, rating: number) => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -96,10 +101,13 @@ export default function RankingScreen() {
                 </View>
               </View>
               <TouchableOpacity
-                style={[styles.miniPlayBtn, playingJokeId === joke.id && styles.miniPlayBtnActive]}
-                onPress={() => handlePlay(joke.id)}
+                style={[styles.miniPlayBtn, isJokeActive(joke.id) && styles.miniPlayBtnActive]}
+                onPress={(e) => {
+                  e.stopPropagation?.();
+                  handlePlay(joke);
+                }}
               >
-                {playingJokeId === joke.id ? (
+                {isJokeActive(joke.id) ? (
                   <Pause size={16} color={Colors.white} fill={Colors.white} />
                 ) : (
                   <Play size={16} color={Colors.white} fill={Colors.white} />
@@ -110,7 +118,7 @@ export default function RankingScreen() {
         })}
       </View>
     );
-  }, [rankedJokes, playingJokeId, handlePlay, router, t]);
+  }, [rankedJokes, isJokeActive, handlePlay, router, t]);
 
   const renderJokeRow = useCallback(({ item, index }: { item: Joke; index: number }) => {
     if (index < 3) return null;
@@ -154,10 +162,13 @@ export default function RankingScreen() {
             <Text style={styles.durationText}>{formatDuration(item.duration)}</Text>
           </View>
           <TouchableOpacity
-            style={[styles.miniPlayBtn, playingJokeId === item.id && styles.miniPlayBtnActive]}
-            onPress={() => handlePlay(item.id)}
+            style={[styles.miniPlayBtn, isJokeActive(item.id) && styles.miniPlayBtnActive]}
+            onPress={(e) => {
+              e.stopPropagation?.();
+              handlePlay(item);
+            }}
           >
-            {playingJokeId === item.id ? (
+            {isJokeActive(item.id) ? (
               <Pause size={14} color={Colors.white} fill={Colors.white} />
             ) : (
               <Play size={14} color={Colors.white} fill={Colors.white} />
@@ -166,7 +177,8 @@ export default function RankingScreen() {
         </View>
       </TouchableOpacity>
     );
-  }, [playingJokeId, handlePlay, handleRate, getMyRating, router, t]);
+  }, [isJokeActive, handlePlay, handleRate, getMyRating, router, t]);
+
 
   return (
     <View style={styles.container}>
@@ -175,6 +187,7 @@ export default function RankingScreen() {
         keyExtractor={(item) => item.id}
         renderItem={renderJokeRow}
         ListHeaderComponent={renderPodium}
+        extraData={`${playingJokeId}-${globalAudioStatus.playing}`}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
       />

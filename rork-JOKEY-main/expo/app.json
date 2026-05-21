@@ -2,7 +2,7 @@
   "expo": {
     "name": "Jokey",
     "slug": "azbb4413e811lknfmyslw",
-    "version": "1.0.1",
+    "version": "1.9",
     "orientation": "portrait",
     "icon": "./assets/images/icon.jpeg",
     "scheme": "rork-app",
@@ -26,18 +26,17 @@
       "bundleIdentifier": "app.rork.azbb4413e811lknfmyslw"
     },
     "android": {
-      "versionCode": 2,
+      "versionCode": 9,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.jpeg",
         "backgroundColor": "#ffffff"
       },
       "package": "app.rork.azbb4413e811lknfmyslw",
-      "permissions": [
-        "android.permission.FOREGROUND_SERVICE_MICROPHONE"
-      ],
       "blockedPermissions": [
         "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.ACCESS_COARSE_LOCATION"
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "android.permission.FOREGROUND_SERVICE_MICROPHONE"
       ]
     },
     "web": {
@@ -52,7 +51,10 @@
       ],
       "expo-font",
       "expo-web-browser",
-      "expo-audio"
+      "expo-audio",
+      "./plugins/withEmbedDebugBundle.js",
+      "./plugins/withAndroidUploadSigning.js",
+      "./plugins/withRemoveForegroundServices.js"
     ],
     "experiments": {
       "typedRoutes": true

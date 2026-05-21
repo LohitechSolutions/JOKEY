@@ -87,6 +87,7 @@ export default function RootLayout() {
       allowsRecording: false,
       shouldRouteThroughEarpiece: false,
       interruptionMode: 'mixWithOthers',
+      shouldPlayInBackground: true,
     });
   }, []);
 
