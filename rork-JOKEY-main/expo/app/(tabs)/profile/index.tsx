@@ -20,9 +20,8 @@ import { useRouter } from 'expo-router';
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { currentUser, jokes, logout, deleteAccount, deleteJoke } = useApp();
+  const { currentUser, jokes, logout, deleteAccount, deleteJoke, updateProfile, isUpdatingProfile } = useApp();
   const { t } = useLanguage();
-  const [localAvatar, setLocalAvatar] = useState<string | null>(null);
 
   const myJokes = useMemo(() => {
     return jokes.filter(j => j.userId === currentUser?.id);
@@ -50,7 +49,7 @@ export default function ProfileScreen() {
       if (Platform.OS !== 'web') {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
-          Alert.alert('Permission requise', 'Veuillez autoriser l\'accès à la galerie photo.');
+          Alert.alert(t('profile.permissionTitle') || 'Permission requise', t('profile.permissionMessage') || 'Veuillez autoriser l\'accès à la galerie photo.');
           return;
         }
       }
@@ -61,13 +60,27 @@ export default function ProfileScreen() {
         quality: 0.8,
       });
       if (!result.canceled && result.assets[0]) {
-        console.log('[Profile] New avatar selected:', result.assets[0].uri);
-        setLocalAvatar(result.assets[0].uri);
+        const selectedUri = result.assets[0].uri;
+        console.log('[Profile] New avatar selected:', selectedUri);
+        try {
+          await updateProfile({ localAvatarUri: selectedUri });
+          console.log('[Profile] Avatar updated successfully');
+        } catch (updateErr) {
+          console.error('[Profile] Failed to update avatar:', updateErr);
+          Alert.alert(
+            t('profile.uploadError') || 'Erreur',
+            t('profile.uploadErrorMessage') || 'Impossible de mettre à jour l\'avatar. Veuillez réessayer.'
+          );
+        }
       }
     } catch (err) {
-      console.log('[Profile] Image picker error:', err);
+      console.error('[Profile] Image picker error:', err);
+      Alert.alert(
+        t('profile.pickerError') || 'Erreur',
+        t('profile.pickerErrorMessage') || 'Une erreur s\'est produite lors de la sélection de l\'image.'
+      );
     }
-  }, []);
+  }, [updateProfile, t]);
 
   const handleLogout = () => {
     Alert.alert(
@@ -137,7 +150,7 @@ export default function ProfileScreen() {
     );
   }
 
-  const avatarUri = localAvatar || currentUser.avatar;
+  const avatarUri = currentUser.avatar;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -145,10 +158,16 @@ export default function ProfileScreen() {
         <View style={styles.avatarSection}>
           <TouchableOpacity onPress={handlePickImage} activeOpacity={0.8}>
             <View style={styles.avatarWrapper}>
-              <Image source={{ uri: avatarUri }} style={styles.avatar} />
-              <View style={styles.cameraOverlay}>
-                <Camera size={16} color={Colors.white} />
-              </View>
+              <Image source={{ uri: avatarUri }} style={[styles.avatar, isUpdatingProfile && { opacity: 0.5 }]} />
+              {isUpdatingProfile ? (
+                <View style={styles.avatarLoading}>
+                  <ActivityIndicator size="small" color={Colors.white} />
+                </View>
+              ) : (
+                <View style={styles.cameraOverlay}>
+                  <Camera size={16} color={Colors.white} />
+                </View>
+              )}
             </View>
           </TouchableOpacity>
           <View style={styles.userInfo}>
@@ -356,6 +375,19 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 3,
     elevation: 4,
+  },
+  avatarLoading: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: Colors.white,
   },
   userInfo: {
     marginLeft: 16,

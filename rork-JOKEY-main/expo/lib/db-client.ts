@@ -440,3 +440,95 @@ export async function deleteUserDataFromDB(userId: string): Promise<void> {
   try { await supabase.from('users').delete().eq('id', userId); } catch (e) { console.warn('[DB] delete user:', e); }
   console.log('[DB] User data deleted');
 }
+
+export async function uploadAvatarToSupabase(localUri: string, userId: string): Promise<string> {
+  console.log('[DB] Uploading avatar to Supabase Storage...', localUri);
+
+  try {
+    const fileName = `${userId}_${Date.now()}.jpg`;
+    const filePath = `avatars/${fileName}`;
+
+    // Read the file as base64 using expo-file-system
+    let fileData: any;
+    
+    if (localUri.startsWith('file://') || localUri.startsWith('/')) {
+      // For native file URIs, read as base64
+      const base64Data = await FileSystem.readAsStringAsync(localUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      console.log('[DB] Read avatar as base64, size:', base64Data.length);
+      
+      // Convert base64 to Blob for upload
+      const binaryString = atob(base64Data);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      fileData = bytes;
+    } else {
+      // For web URLs, use fetch
+      const response = await fetch(localUri);
+      if (!response.ok) {
+        throw new Error(`Failed to read file: ${response.statusText}`);
+      }
+      fileData = await response.arrayBuffer();
+      console.log('[DB] Downloaded avatar, size:', fileData.byteLength);
+    }
+
+    console.log('[DB] Uploading avatar to Supabase Storage, size:', fileData.length || fileData.byteLength);
+
+    const { data, error } = await supabase.storage
+      .from('avatars')
+      .upload(filePath, fileData, {
+        contentType: 'image/jpeg',
+        upsert: true,
+        duplex: 'half',
+      });
+
+    if (error) {
+      console.error('[DB] Avatar upload error:', error.message);
+      throw new Error(error.message);
+    }
+
+    console.log('[DB] Avatar uploaded successfully:', filePath);
+
+    const { data: publicUrlData } = supabase.storage
+      .from('avatars')
+      .getPublicUrl(filePath);
+
+    console.log('[DB] Avatar public URL:', publicUrlData.publicUrl);
+    return publicUrlData.publicUrl;
+  } catch (err: any) {
+    console.error('[DB] uploadAvatar exception:', err?.message);
+    throw err;
+  }
+}
+
+export async function updateUserProfile(userId: string, updates: Partial<User>): Promise<User | null> {
+  console.log('[DB] Updating user profile for:', userId, updates);
+  try {
+    const dbUpdates: any = {};
+    if (updates.displayName !== undefined) dbUpdates.display_name = updates.displayName;
+    if (updates.avatar !== undefined) dbUpdates.avatar = updates.avatar;
+    if (updates.bio !== undefined) dbUpdates.bio = updates.bio;
+    if (updates.language !== undefined) dbUpdates.language = updates.language;
+    if (updates.role !== undefined) dbUpdates.role = updates.role;
+
+    const { data, error } = await supabase
+      .from('users')
+      .update(dbUpdates)
+      .eq('id', userId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('[DB] Error updating profile:', error.message);
+      throw new Error(error.message);
+    }
+
+    return mapDbUserToUser(data);
+  } catch (err: any) {
+    console.error('[DB] updateUserProfile exception:', err?.message);
+    throw err;
+  }
+}

@@ -26,7 +26,7 @@ import { LANGUAGE_OPTIONS } from '@/constants/translations';
 type AuthMode = 'login' | 'register' | 'forgot' | 'reset';
 
 export default function AuthScreen() {
-  const { login, register, authError, isRegistering, isLoggingIn, requestPasswordReset, isRequestingReset } = useApp();
+  const { login, register, authError, isRegistering, isLoggingIn, requestPasswordReset, isRequestingReset, confirmPasswordReset, isConfirmingReset, isPasswordRecovery, setIsPasswordRecovery } = useApp();
   const { t, language, changeLanguage } = useLanguage();
   const [mode, setMode] = useState<AuthMode>('register');
   const [username, setUsername] = useState('');
@@ -37,6 +37,12 @@ export default function AuthScreen() {
 
   const [resetEmail, setResetEmail] = useState('');
   const [_resetSent, setResetSent] = useState(false);
+
+  // For the "set new password" form after clicking the reset link
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
 
   const logoScale = useRef(new Animated.Value(0)).current;
   const formOpacity = useRef(new Animated.Value(0)).current;
@@ -130,6 +136,34 @@ export default function AuthScreen() {
 
   const isSubmitting = isRegistering || isLoggingIn;
 
+  const handleSetNewPassword = async () => {
+    if (newPassword.length < 6) {
+      Alert.alert('Erreur', 'Le mot de passe doit contenir au moins 6 caractères');
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      Alert.alert('Erreur', 'Les mots de passe ne correspondent pas');
+      return;
+    }
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      await confirmPasswordReset({ email: '', code: '', newPassword });
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setNewPassword('');
+      setConfirmNewPassword('');
+      Alert.alert(
+        'Mot de passe mis à jour !',
+        'Votre mot de passe a été réinitialisé avec succès. Veuillez vous connecter.',
+        [{ text: 'OK', onPress: () => {
+          setIsPasswordRecovery(false);
+          setMode('login');
+        }}]
+      );
+    } catch (err: any) {
+      Alert.alert(t('auth.error'), err.message || 'Erreur lors de la mise à jour');
+    }
+  };
+
   const renderForgotForm = () => (
     <Animated.View style={[styles.formCard, { opacity: formOpacity }]}>
       <TouchableOpacity style={styles.backBtn} onPress={() => setMode('login')}>
@@ -192,6 +226,66 @@ export default function AuthScreen() {
     </Animated.View>
   );
 
+  const renderSetNewPasswordForm = () => (
+    <Animated.View style={[styles.formCard, { opacity: formOpacity }]}>
+      <View style={styles.emailSentContainer}>
+        <View style={styles.emailSentIcon}>
+          <Lock size={32} color={Colors.primary} />
+        </View>
+        <Text style={styles.formTitle}>Nouveau mot de passe</Text>
+        <Text style={styles.formSubtitle}>Choisissez un nouveau mot de passe sécurisé pour votre compte.</Text>
+      </View>
+
+      <View style={styles.inputGroup}>
+        <View style={styles.inputIcon}>
+          <Lock size={20} color={Colors.primary} />
+        </View>
+        <TextInput
+          style={styles.inputPassword}
+          placeholder="Nouveau mot de passe"
+          placeholderTextColor={Colors.textMuted}
+          value={newPassword}
+          onChangeText={setNewPassword}
+          secureTextEntry={!showNewPassword}
+          autoCapitalize="none"
+        />
+        <TouchableOpacity style={styles.eyeBtn} onPress={() => setShowNewPassword(!showNewPassword)}>
+          {showNewPassword ? <EyeOff size={20} color={Colors.textMuted} /> : <Eye size={20} color={Colors.textMuted} />}
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.inputGroup}>
+        <View style={styles.inputIcon}>
+          <Lock size={20} color={Colors.primary} />
+        </View>
+        <TextInput
+          style={styles.inputPassword}
+          placeholder="Confirmer le mot de passe"
+          placeholderTextColor={Colors.textMuted}
+          value={confirmNewPassword}
+          onChangeText={setConfirmNewPassword}
+          secureTextEntry={!showConfirmNewPassword}
+          autoCapitalize="none"
+        />
+        <TouchableOpacity style={styles.eyeBtn} onPress={() => setShowConfirmNewPassword(!showConfirmNewPassword)}>
+          {showConfirmNewPassword ? <EyeOff size={20} color={Colors.textMuted} /> : <Eye size={20} color={Colors.textMuted} />}
+        </TouchableOpacity>
+      </View>
+
+      <TouchableOpacity
+        style={[styles.submitBtn, isConfirmingReset && styles.submitBtnDisabled]}
+        onPress={handleSetNewPassword}
+        disabled={isConfirmingReset}
+      >
+        {isConfirmingReset ? (
+          <ActivityIndicator color={Colors.accent} />
+        ) : (
+          <Text style={styles.submitBtnText}>Enregistrer le mot de passe</Text>
+        )}
+      </TouchableOpacity>
+    </Animated.View>
+  );
+
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -240,7 +334,7 @@ export default function AuthScreen() {
             <Text style={styles.tagline}>{t('auth.tagline')}</Text>
           </Animated.View>
 
-          {mode === 'forgot' ? renderForgotForm() : mode === 'reset' ? renderResetForm() : (
+          {isPasswordRecovery ? renderSetNewPasswordForm() : mode === 'forgot' ? renderForgotForm() : mode === 'reset' ? renderResetForm() : (
             <Animated.View style={[styles.formCard, { opacity: formOpacity }]}>
               <Text style={styles.formTitle}>
                 {mode === 'register' ? t('auth.createAccount') : t('auth.login')}

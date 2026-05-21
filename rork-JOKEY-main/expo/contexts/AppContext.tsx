@@ -7,7 +7,7 @@ import { User, Joke, ReactionEmoji, SubscriptionPlan } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { setCachedUser, getCachedUser } from '@/lib/auth-storage';
 import { clientRegister, clientLogin, clientDeleteAccount, clientRequestPasswordReset, clientConfirmPasswordReset, signOutSupabase, clientGetMe } from '@/lib/auth-client';
-import { ensureDBReady, fetchJokesFromDB, toggleReactionInDB, rateJokeInDB, toggleFollowInDB, deleteJokeFromDB, ensureUserRecordExists } from '@/lib/db-client';
+import { ensureDBReady, fetchJokesFromDB, toggleReactionInDB, rateJokeInDB, toggleFollowInDB, deleteJokeFromDB, ensureUserRecordExists, uploadAvatarToSupabase, updateUserProfile } from '@/lib/db-client';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 
@@ -170,6 +170,8 @@ export const [AppProvider, useApp] = createContextHook(() => {
     retry: 1,
   });
 
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState<boolean>(false);
+
   useEffect(() => {
     if (!isSupabaseConfigured) return;
 
@@ -179,15 +181,23 @@ export const [AppProvider, useApp] = createContextHook(() => {
         setCurrentUser(null);
         setIsAuthenticated(false);
         queryClient.setQueryData(['auth-restore'], null);
+      } else if (event === 'PASSWORD_RECOVERY') {
+        // User clicked the reset password link in their email.
+        // Supabase has established a recovery session. Signal the UI to show
+        // the "set new password" form.
+        console.log('[AppContext] PASSWORD_RECOVERY event — showing reset form');
+        setIsPasswordRecovery(true);
       } else if (event === 'SIGNED_IN' && session?.user) {
-        void queryClient.invalidateQueries({ queryKey: ['auth-restore'] });
+        if (!isPasswordRecovery) {
+          void queryClient.invalidateQueries({ queryKey: ['auth-restore'] });
+        }
       }
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [queryClient]);
+  }, [queryClient, isPasswordRecovery]);
 
   const jokesQuery = useQuery({
     queryKey: ['jokes-list'],
@@ -613,6 +623,47 @@ export const [AppProvider, useApp] = createContextHook(() => {
     },
   });
 
+  const updateProfileMutation = useMutation({
+    mutationFn: async (updates: Partial<User> & { localAvatarUri?: string }) => {
+      if (!currentUser) throw new Error('Not authenticated');
+      
+      let avatarUrl = updates.avatar;
+      if (updates.localAvatarUri) {
+        if (!dbReady) {
+          throw new Error('Database not ready. Please check your connection and try again.');
+        }
+        try {
+          avatarUrl = await uploadAvatarToSupabase(updates.localAvatarUri, currentUser.id);
+          console.log('[AppContext] Avatar uploaded successfully:', avatarUrl);
+        } catch (uploadErr: any) {
+          console.error('[AppContext] Avatar upload failed:', uploadErr?.message);
+          throw new Error(`Avatar upload failed: ${uploadErr?.message}`);
+        }
+      }
+      
+      if (avatarUrl || updates.avatar !== undefined) {
+        const updatedUser = await updateUserProfile(currentUser.id, { ...updates, avatar: avatarUrl });
+        return updatedUser;
+      }
+      
+      return currentUser;
+    },
+    onSuccess: async (updatedUser) => {
+      if (updatedUser) {
+        setCurrentUser(updatedUser);
+        await setCachedUser(updatedUser);
+        console.log('[AppContext] Profile updated successfully');
+      }
+    },
+    onError: (error: Error) => {
+      console.error('[AppContext] Update profile error:', error.message);
+    },
+  });
+
+  const updateProfile = useCallback((updates: Partial<User> & { localAvatarUri?: string }) => {
+    return updateProfileMutation.mutateAsync(updates);
+  }, [updateProfileMutation]);
+
   const deleteJoke = useCallback((jokeId: string, audioUri: string) => {
     deleteJokeMutation.mutate({ jokeId, audioUri });
   }, [deleteJokeMutation]);
@@ -865,6 +916,8 @@ export const [AppProvider, useApp] = createContextHook(() => {
     addJoke,
     deleteJoke,
     isDeletingJoke: deleteJokeMutation.isPending,
+    updateProfile,
+    isUpdatingProfile: updateProfileMutation.isPending,
     isFollowing,
     getJokeReactions,
     getMyRating,
@@ -897,11 +950,15 @@ export const [AppProvider, useApp] = createContextHook(() => {
     confirmPasswordReset,
     isRequestingReset: requestPasswordResetMutation.isPending,
     isConfirmingReset: confirmPasswordResetMutation.isPending,
+    isPasswordRecovery,
+    setIsPasswordRecovery,
   }), [
     currentUser, isAuthenticated, authChecked, authError, jokes, followingIds,
     playingJokeId, playJoke, pauseAudio, globalAudioStatus,
     login, register, logout, deleteAccount, toggleFollow,
-    addReaction, rateJoke, addJoke, deleteJoke, deleteJokeMutation.isPending, isFollowing, getJokeReactions, getMyRating,
+    addReaction, rateJoke, addJoke, deleteJoke, deleteJokeMutation.isPending,
+    updateProfile, updateProfileMutation.isPending,
+    isFollowing, getJokeReactions, getMyRating,
     totalReactions, isSubscribed, subscriptionPlan, subscribe,
     listenCount, createCount, incrementListenCount, incrementCreateCount,
     canListen, canCreate, sendTip, getTipsForUser, tipsBalance,
@@ -911,5 +968,6 @@ export const [AppProvider, useApp] = createContextHook(() => {
     logoutMutation.isPending, deleteMutation.isPending,
     requestPasswordReset, confirmPasswordReset,
     requestPasswordResetMutation.isPending, confirmPasswordResetMutation.isPending,
+    isPasswordRecovery, setIsPasswordRecovery,
   ]);
 });

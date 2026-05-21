@@ -327,7 +327,9 @@ export async function clientRequestPasswordReset(email: string): Promise<{ succe
   const normalizedEmail = email.trim().toLowerCase();
   console.log('[AuthClient] Password reset request for:', normalizedEmail);
 
-  const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail);
+  const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+    redirectTo: 'rork-app://reset-password',
+  });
 
   if (error) {
     console.error('[AuthClient] Reset password error:', error.message);
