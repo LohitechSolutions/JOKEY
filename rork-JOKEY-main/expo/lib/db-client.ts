@@ -1,6 +1,9 @@
 import { supabase, isSupabaseConfigured } from './supabase';
-import { User, Joke, ReactionEmoji } from '@/types';
+import { User, Joke, ReactionEmoji, Comment } from '@/types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
+
+const LOCAL_COMMENTS_KEY = 'joky_local_comments';
 
 
 
@@ -37,6 +40,77 @@ export async function ensureDBReady(): Promise<boolean> {
   }
 }
 
+type UserCounterField = 'jokes_count' | 'followers_count' | 'following_count';
+
+async function adjustUserCounter(
+  userId: string,
+  field: UserCounterField,
+  delta: number
+): Promise<void> {
+  if (!delta) return;
+
+  const { data, error } = await supabase.from('users').select(field).eq('id', userId).single();
+  if (error || !data) {
+    console.warn('[DB] adjustUserCounter read failed:', field, error?.message);
+    return;
+  }
+
+  const current = (data as Record<UserCounterField, number>)[field] || 0;
+  const next = Math.max(0, current + delta);
+  const { error: updateError } = await supabase.from('users').update({ [field]: next }).eq('id', userId);
+  if (updateError) {
+    console.warn('[DB] adjustUserCounter update failed:', field, updateError.message);
+  }
+}
+
+export async function refreshUserProfileStats(
+  userId: string
+): Promise<Pick<User, 'jokesCount' | 'followersCount' | 'followingCount'>> {
+  const [jokesResult, followersResult, followingResult] = await Promise.all([
+    supabase.from('jokes').select('*', { count: 'exact', head: true }).eq('user_id', userId),
+    supabase.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', userId),
+    supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', userId),
+  ]);
+
+  const jokesCount = jokesResult.count ?? 0;
+  const followersCount = followersResult.count ?? 0;
+  const followingCount = followingResult.count ?? 0;
+
+  const { error } = await supabase
+    .from('users')
+    .update({ jokes_count: jokesCount, followers_count: followersCount, following_count: followingCount })
+    .eq('id', userId);
+
+  if (error) {
+    console.warn('[DB] refreshUserProfileStats update failed:', error.message);
+  }
+
+  return { jokesCount, followersCount, followingCount };
+}
+
+export async function fetchFollowingIdsFromDB(userId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('follows')
+    .select('following_id')
+    .eq('follower_id', userId);
+
+  if (error) {
+    console.warn('[DB] fetchFollowingIds error:', error.message);
+    return [];
+  }
+
+  return (data ?? []).map((row) => row.following_id).filter(Boolean);
+}
+
+export async function fetchTotalUserCount(): Promise<number> {
+  const { count, error } = await supabase.from('users').select('*', { count: 'exact', head: true });
+  if (error) {
+    console.warn('[DB] fetchTotalUserCount error:', error.message);
+    return 0;
+  }
+  return count ?? 0;
+}
+
 function mapDbUserToUser(row: any): User {
   return {
     id: row.id,
@@ -54,6 +128,140 @@ function mapDbUserToUser(row: any): User {
     createdAt: row.created_at || '',
     isFollowing: false,
   };
+}
+
+function mapDbCommentToComment(row: any, userMap: Map<string, User>): Comment {
+  const userId = row.user_id || '';
+  return {
+    id: row.id,
+    userId,
+    user: userMap.get(userId) || {
+      id: userId,
+      username: 'unknown',
+      displayName: 'Unknown',
+      avatar: 'https://ui-avatars.com/api/?name=U&background=1565C0&color=fff&size=150',
+      bio: '',
+      language: 'FR',
+      role: 'visitor' as const,
+      jokesCount: 0,
+      totalLikes: 0,
+      followersCount: 0,
+      followingCount: 0,
+      isFollowing: false,
+      badges: [],
+      createdAt: '',
+    },
+    jokeId: row.joke_id || '',
+    text: row.text || '',
+    createdAt: row.created_at || new Date().toISOString(),
+    likes: row.likes || 0,
+  };
+}
+
+async function readLocalCommentsStore(): Promise<Record<string, Comment[]>> {
+  try {
+    const raw = await AsyncStorage.getItem(LOCAL_COMMENTS_KEY);
+    return raw ? JSON.parse(raw) as Record<string, Comment[]> : {};
+  } catch {
+    return {};
+  }
+}
+
+async function writeLocalCommentsStore(store: Record<string, Comment[]>): Promise<void> {
+  await AsyncStorage.setItem(LOCAL_COMMENTS_KEY, JSON.stringify(store));
+}
+
+export async function fetchCommentsFromDB(jokeId: string): Promise<Comment[]> {
+  if (!isClientDBAvailable()) {
+    const store = await readLocalCommentsStore();
+    return store[jokeId] ?? [];
+  }
+
+  try {
+    const { data: rows, error } = await supabase
+      .from('comments')
+      .select('*')
+      .eq('joke_id', jokeId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      if (error.message.includes('does not exist') || error.code === '42P01') {
+        console.warn('[DB] comments table missing — run supabase-comments.sql');
+        return [];
+      }
+      console.warn('[DB] fetchComments error:', error.message);
+      return [];
+    }
+
+    if (!rows || rows.length === 0) return [];
+
+    const userIds = Array.from(new Set(rows.map((row) => row.user_id).filter(Boolean)));
+    const userMap = new Map<string, User>();
+
+    if (userIds.length > 0) {
+      const { data: users, error: usersError } = await supabase
+        .from('users')
+        .select('*')
+        .in('id', userIds);
+
+      if (!usersError && users) {
+        for (const user of users) {
+          userMap.set(user.id, mapDbUserToUser(user));
+        }
+      }
+    }
+
+    return rows.map((row) => mapDbCommentToComment(row, userMap));
+  } catch (err: any) {
+    console.error('[DB] fetchComments exception:', err?.message);
+    return [];
+  }
+}
+
+export async function addCommentToDB(jokeId: string, user: User, text: string): Promise<Comment> {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    throw new Error('Comment cannot be empty');
+  }
+
+  const comment: Comment = {
+    id: `c_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    userId: user.id,
+    user,
+    jokeId,
+    text: trimmed,
+    createdAt: new Date().toISOString(),
+    likes: 0,
+  };
+
+  if (!isClientDBAvailable()) {
+    const store = await readLocalCommentsStore();
+    const existing = store[jokeId] ?? [];
+    store[jokeId] = [comment, ...existing];
+    await writeLocalCommentsStore(store);
+    return comment;
+  }
+
+  await ensureUserRecordExists(user);
+
+  const { error } = await supabase.from('comments').insert({
+    id: comment.id,
+    joke_id: jokeId,
+    user_id: user.id,
+    text: trimmed,
+    likes: 0,
+  });
+
+  if (error) {
+    console.error('[DB] addComment error:', error.message);
+    throw new Error(error.message);
+  }
+
+  const { data: jokeRow } = await supabase.from('jokes').select('comments_count').eq('id', jokeId).single();
+  const nextCount = (jokeRow?.comments_count ?? 0) + 1;
+  await supabase.from('jokes').update({ comments_count: nextCount }).eq('id', jokeId);
+
+  return comment;
 }
 
 function mapDbJokeToJoke(row: any, userMap: Map<string, User>): Joke {
@@ -371,6 +579,8 @@ export async function createJokeInDB(joke: {
     
     throw new Error(error.message);
   }
+
+  await adjustUserCounter(joke.userId, 'jokes_count', 1);
   console.log('[DB] Joke created:', joke.id);
 }
 
@@ -458,9 +668,13 @@ export async function toggleFollowInDB(followerId: string, followingId: string):
 
     if (existing) {
       await supabase.from('follows').delete().eq('id', existing.id);
+      await adjustUserCounter(followingId, 'followers_count', -1);
+      await adjustUserCounter(followerId, 'following_count', -1);
       return { following: false };
     } else {
       await supabase.from('follows').insert({ follower_id: followerId, following_id: followingId });
+      await adjustUserCounter(followingId, 'followers_count', 1);
+      await adjustUserCounter(followerId, 'following_count', 1);
       return { following: true };
     }
   } catch (err: any) {
@@ -472,6 +686,8 @@ export async function toggleFollowInDB(followerId: string, followingId: string):
 export async function deleteJokeFromDB(jokeId: string, audioUri: string): Promise<void> {
   console.log('[DB] Deleting joke:', jokeId);
   try {
+    const { data: jokeRow } = await supabase.from('jokes').select('user_id').eq('id', jokeId).single();
+
     if (audioUri && audioUri.includes('/storage/v1/object/public/audio/')) {
       const storagePath = audioUri.split('/storage/v1/object/public/audio/')[1];
       if (storagePath) {
@@ -487,11 +703,16 @@ export async function deleteJokeFromDB(jokeId: string, audioUri: string): Promis
 
     await supabase.from('reactions').delete().eq('joke_id', jokeId);
     await supabase.from('ratings').delete().eq('joke_id', jokeId);
+    await supabase.from('comments').delete().eq('joke_id', jokeId);
 
     const { error } = await supabase.from('jokes').delete().eq('id', jokeId);
     if (error) {
       console.error('[DB] Error deleting joke:', error.message);
       throw new Error(error.message);
+    }
+
+    if (jokeRow?.user_id) {
+      await adjustUserCounter(jokeRow.user_id, 'jokes_count', -1);
     }
     console.log('[DB] Joke deleted:', jokeId);
   } catch (err: any) {
@@ -504,73 +725,11 @@ export async function deleteUserDataFromDB(userId: string): Promise<void> {
   console.log('[DB] Deleting user data for:', userId);
   try { await supabase.from('reactions').delete().eq('user_id', userId); } catch (e) { console.warn('[DB] delete reactions:', e); }
   try { await supabase.from('ratings').delete().eq('user_id', userId); } catch (e) { console.warn('[DB] delete ratings:', e); }
+  try { await supabase.from('comments').delete().eq('user_id', userId); } catch (e) { console.warn('[DB] delete comments:', e); }
   try { await supabase.from('follows').delete().or(`follower_id.eq.${userId},following_id.eq.${userId}`); } catch (e) { console.warn('[DB] delete follows:', e); }
   try { await supabase.from('jokes').delete().eq('user_id', userId); } catch (e) { console.warn('[DB] delete jokes:', e); }
   try { await supabase.from('users').delete().eq('id', userId); } catch (e) { console.warn('[DB] delete user:', e); }
   console.log('[DB] User data deleted');
-}
-
-export async function uploadAvatarToSupabase(localUri: string, userId: string): Promise<string> {
-  console.log('[DB] Uploading avatar to Supabase Storage...', localUri);
-
-  try {
-    const fileName = `${userId}_${Date.now()}.jpg`;
-    const filePath = `avatars/${fileName}`;
-
-    // Read the file as base64 using expo-file-system
-    let fileData: any;
-    
-    if (localUri.startsWith('file://') || localUri.startsWith('/')) {
-      // For native file URIs, read as base64
-      const base64Data = await FileSystem.readAsStringAsync(localUri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-      console.log('[DB] Read avatar as base64, size:', base64Data.length);
-      
-      // Convert base64 to Blob for upload
-      const binaryString = atob(base64Data);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-      fileData = bytes;
-    } else {
-      // For web URLs, use fetch
-      const response = await fetch(localUri);
-      if (!response.ok) {
-        throw new Error(`Failed to read file: ${response.statusText}`);
-      }
-      fileData = await response.arrayBuffer();
-      console.log('[DB] Downloaded avatar, size:', fileData.byteLength);
-    }
-
-    console.log('[DB] Uploading avatar to Supabase Storage, size:', fileData.length || fileData.byteLength);
-
-    const { data, error } = await supabase.storage
-      .from('avatars')
-      .upload(filePath, fileData, {
-        contentType: 'image/jpeg',
-        upsert: true,
-        duplex: 'half',
-      });
-
-    if (error) {
-      console.error('[DB] Avatar upload error:', error.message);
-      throw new Error(error.message);
-    }
-
-    console.log('[DB] Avatar uploaded successfully:', filePath);
-
-    const { data: publicUrlData } = supabase.storage
-      .from('avatars')
-      .getPublicUrl(filePath);
-
-    console.log('[DB] Avatar public URL:', publicUrlData.publicUrl);
-    return publicUrlData.publicUrl;
-  } catch (err: any) {
-    console.error('[DB] uploadAvatar exception:', err?.message);
-    throw err;
-  }
 }
 
 export async function updateUserProfile(userId: string, updates: Partial<User>): Promise<User | null> {

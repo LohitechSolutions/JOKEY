@@ -90,7 +90,7 @@ export default function UserProfileScreen() {
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
             <Mic size={14} color={Colors.primary} />
-            <Text style={styles.statValue}>{user.jokesCount}</Text>
+            <Text style={styles.statValue}>{userJokes.length}</Text>
             <Text style={styles.statLabel}>{t('profile.jokes')}</Text>
           </View>
           <View style={styles.statDivider} />

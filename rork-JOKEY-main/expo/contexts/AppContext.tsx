@@ -7,9 +7,18 @@ import { User, Joke, ReactionEmoji, SubscriptionPlan } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { setCachedUser, getCachedUser } from '@/lib/auth-storage';
 import { clientRegister, clientLogin, clientDeleteAccount, clientRequestPasswordReset, clientConfirmPasswordReset, signOutSupabase, clientGetMe } from '@/lib/auth-client';
-import { ensureDBReady, fetchJokesFromDB, toggleReactionInDB, rateJokeInDB, toggleFollowInDB, deleteJokeFromDB, ensureUserRecordExists, uploadAvatarToSupabase, updateUserProfile, updateUserProfileInDB } from '@/lib/db-client';
+import { handleAuthDeepLink } from '@/lib/auth-deep-link';
+import * as Linking from 'expo-linking';
+import { ensureDBReady, fetchJokesFromDB, toggleReactionInDB, rateJokeInDB, toggleFollowInDB, deleteJokeFromDB, ensureUserRecordExists, uploadAvatarToSupabase, updateUserProfileInDB, refreshUserProfileStats, fetchFollowingIdsFromDB, fetchTotalUserCount } from '@/lib/db-client';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+
+const PASSWORD_RECOVERY_USER = { __passwordRecovery: true } as const;
+type AuthRestoreResult = User | null | typeof PASSWORD_RECOVERY_USER;
+
+function isPasswordRecoveryResult(data: AuthRestoreResult): data is typeof PASSWORD_RECOVERY_USER {
+  return data !== null && typeof data === 'object' && '__passwordRecovery' in data;
+}
 
 const STORAGE_KEYS = {
   SUBSCRIPTION: 'joky_subscription',
@@ -54,6 +63,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const [createCount, setCreateCount] = useState<number>(0);
   const [tipsBalance, setTipsBalance] = useState<Record<string, number>>({});
   const [dbReady, setDbReady] = useState<boolean>(false);
+  const [totalUsers, setTotalUsers] = useState<number>(0);
 
   const globalPlayer = useAudioPlayer(null);
   const globalAudioStatus = useAudioPlayerStatus(globalPlayer);
@@ -97,7 +107,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
 
   const authQuery = useQuery({
     queryKey: ['auth-restore'],
-    queryFn: async () => {
+    queryFn: async (): Promise<AuthRestoreResult> => {
       console.log('[AppContext] Restoring auth session... Supabase configured:', isSupabaseConfigured);
 
       if (!isSupabaseConfigured) {
@@ -110,6 +120,15 @@ export const [AppProvider, useApp] = createContextHook(() => {
       }
 
       try {
+        const initialUrl = await Linking.getInitialURL();
+        if (initialUrl) {
+          const mode = await handleAuthDeepLink(initialUrl);
+          if (mode === 'recovery') {
+            console.log('[AppContext] Password recovery deep link handled on launch');
+            return PASSWORD_RECOVERY_USER;
+          }
+        }
+
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
         if (sessionError) {
@@ -183,11 +202,11 @@ export const [AppProvider, useApp] = createContextHook(() => {
         setIsAuthenticated(false);
         queryClient.setQueryData(['auth-restore'], null);
       } else if (event === 'PASSWORD_RECOVERY') {
-        // User clicked the reset password link in their email.
-        // Supabase has established a recovery session. Signal the UI to show
-        // the "set new password" form.
         console.log('[AppContext] PASSWORD_RECOVERY event — showing reset form');
         setIsPasswordRecovery(true);
+        setCurrentUser(null);
+        setIsAuthenticated(false);
+        queryClient.setQueryData(['auth-restore'], PASSWORD_RECOVERY_USER);
       } else if (event === 'SIGNED_IN' && session?.user) {
         if (!isPasswordRecovery) {
           void queryClient.invalidateQueries({ queryKey: ['auth-restore'] });
@@ -195,8 +214,26 @@ export const [AppProvider, useApp] = createContextHook(() => {
       }
     });
 
+    const linkingSub = Linking.addEventListener('url', ({ url }) => {
+      void (async () => {
+        try {
+          const mode = await handleAuthDeepLink(url);
+          if (mode === 'recovery') {
+            console.log('[AppContext] Password recovery deep link handled while running');
+            setIsPasswordRecovery(true);
+            setCurrentUser(null);
+            setIsAuthenticated(false);
+            queryClient.setQueryData(['auth-restore'], PASSWORD_RECOVERY_USER);
+          }
+        } catch (err) {
+          console.error('[AppContext] Deep link handling failed:', err);
+        }
+      })();
+    });
+
     return () => {
       subscription.unsubscribe();
+      linkingSub.remove();
     };
   }, [queryClient, isPasswordRecovery]);
 
@@ -213,7 +250,11 @@ export const [AppProvider, useApp] = createContextHook(() => {
 
   useEffect(() => {
     if (authQuery.isFetched) {
-      if (authQuery.data) {
+      if (authQuery.data && isPasswordRecoveryResult(authQuery.data)) {
+        setCurrentUser(null);
+        setIsAuthenticated(false);
+        setIsPasswordRecovery(true);
+      } else if (authQuery.data) {
         setCurrentUser(authQuery.data);
         setIsAuthenticated(true);
         console.log('[AppContext] User restored:', authQuery.data.username);
@@ -229,6 +270,93 @@ export const [AppProvider, useApp] = createContextHook(() => {
       setAuthChecked(true);
     }
   }, [authQuery.data, authQuery.isFetched, dbReady]);
+
+  useEffect(() => {
+    if (!dbReady || !currentUser) return;
+
+    let cancelled = false;
+
+    const syncProfile = async () => {
+      try {
+        const [stats, following] = await Promise.all([
+          refreshUserProfileStats(currentUser.id),
+          fetchFollowingIdsFromDB(currentUser.id),
+        ]);
+        if (cancelled) return;
+        setCurrentUser((prev) => (prev ? { ...prev, ...stats } : prev));
+        setFollowingIds(following);
+      } catch (err) {
+        console.warn('[AppContext] Profile stats sync failed:', err);
+      }
+    };
+
+    void syncProfile();
+    return () => { cancelled = true; };
+  }, [dbReady, currentUser?.id]);
+
+  useEffect(() => {
+    if (!dbReady) return;
+
+    let cancelled = false;
+
+    const loadUserCount = async () => {
+      const count = await fetchTotalUserCount();
+      if (!cancelled) setTotalUsers(count);
+    };
+
+    void loadUserCount();
+
+    const channel = supabase
+      .channel('total-users')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'users' }, () => {
+        void loadUserCount();
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'users' }, () => {
+        void loadUserCount();
+      })
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      void supabase.removeChannel(channel);
+    };
+  }, [dbReady]);
+
+  useEffect(() => {
+    if (!dbReady || !currentUser) return;
+
+    const channel = supabase
+      .channel(`user-stats-${currentUser.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'users',
+          filter: `id=eq.${currentUser.id}`,
+        },
+        (payload) => {
+          const row = payload.new as Record<string, number | string | null>;
+          setCurrentUser((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  jokesCount: typeof row.jokes_count === 'number' ? row.jokes_count : prev.jokesCount,
+                  followersCount:
+                    typeof row.followers_count === 'number' ? row.followers_count : prev.followersCount,
+                  followingCount:
+                    typeof row.following_count === 'number' ? row.following_count : prev.followingCount,
+                }
+              : prev
+          );
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [dbReady, currentUser?.id]);
 
   useEffect(() => {
     if (authQuery.isError) {
@@ -540,6 +668,21 @@ export const [AppProvider, useApp] = createContextHook(() => {
       } else {
         setFollowingIds(prev => prev.filter(id => id !== userId));
       }
+
+      setJokes(prev => prev.map(j => {
+        if (j.userId !== userId || !j.user) return j;
+        return {
+          ...j,
+          user: {
+            ...j.user,
+            followersCount: Math.max(0, j.user.followersCount + (data.following ? 1 : -1)),
+          },
+        };
+      }));
+
+      setCurrentUser(prev => prev
+        ? { ...prev, followingCount: Math.max(0, prev.followingCount + (data.following ? 1 : -1)) }
+        : prev);
     },
   });
 
@@ -674,17 +817,29 @@ export const [AppProvider, useApp] = createContextHook(() => {
 
   const addJoke = useCallback((joke: Joke) => {
     setJokes(prev => [joke, ...prev]);
+    if (currentUser && joke.userId === currentUser.id) {
+      setCurrentUser(prev => prev ? { ...prev, jokesCount: prev.jokesCount + 1 } : prev);
+    }
+  }, [currentUser]);
+
+  const updateJokeCommentsCount = useCallback((jokeId: string, count: number) => {
+    setJokes(prev => prev.map(j => (j.id === jokeId ? { ...j, commentsCount: count } : j)));
   }, []);
 
   const deleteJokeMutation = useMutation({
-    mutationFn: async ({ jokeId, audioUri }: { jokeId: string; audioUri: string }) => {
+    mutationFn: async ({ jokeId, audioUri, ownerId }: { jokeId: string; audioUri: string; ownerId?: string }) => {
       if (dbReady) {
         await deleteJokeFromDB(jokeId, audioUri);
       }
-      return jokeId;
+      return { jokeId, ownerId };
     },
-    onSuccess: (jokeId) => {
+    onSuccess: ({ jokeId, ownerId }) => {
       setJokes(prev => prev.filter(j => j.id !== jokeId));
+      if (ownerId && currentUser?.id === ownerId) {
+        setCurrentUser(prev => prev
+          ? { ...prev, jokesCount: Math.max(0, prev.jokesCount - 1) }
+          : prev);
+      }
       console.log('[AppContext] Joke deleted:', jokeId);
     },
     onError: (error: Error) => {
@@ -692,50 +847,10 @@ export const [AppProvider, useApp] = createContextHook(() => {
     },
   });
 
-  const updateProfileMutation = useMutation({
-    mutationFn: async (updates: Partial<User> & { localAvatarUri?: string }) => {
-      if (!currentUser) throw new Error('Not authenticated');
-      
-      let avatarUrl = updates.avatar;
-      if (updates.localAvatarUri) {
-        if (!dbReady) {
-          throw new Error('Database not ready. Please check your connection and try again.');
-        }
-        try {
-          avatarUrl = await uploadAvatarToSupabase(updates.localAvatarUri, currentUser.id);
-          console.log('[AppContext] Avatar uploaded successfully:', avatarUrl);
-        } catch (uploadErr: any) {
-          console.error('[AppContext] Avatar upload failed:', uploadErr?.message);
-          throw new Error(`Avatar upload failed: ${uploadErr?.message}`);
-        }
-      }
-      
-      if (avatarUrl || updates.avatar !== undefined) {
-        const updatedUser = await updateUserProfile(currentUser.id, { ...updates, avatar: avatarUrl });
-        return updatedUser;
-      }
-      
-      return currentUser;
-    },
-    onSuccess: async (updatedUser) => {
-      if (updatedUser) {
-        setCurrentUser(updatedUser);
-        await setCachedUser(updatedUser);
-        console.log('[AppContext] Profile updated successfully');
-      }
-    },
-    onError: (error: Error) => {
-      console.error('[AppContext] Update profile error:', error.message);
-    },
-  });
-
-  const updateProfile = useCallback((updates: Partial<User> & { localAvatarUri?: string }) => {
-    return updateProfileMutation.mutateAsync(updates);
-  }, [updateProfileMutation]);
-
   const deleteJoke = useCallback((jokeId: string, audioUri: string) => {
-    deleteJokeMutation.mutate({ jokeId, audioUri });
-  }, [deleteJokeMutation]);
+    const ownerId = jokes.find(j => j.id === jokeId)?.userId;
+    deleteJokeMutation.mutate({ jokeId, audioUri, ownerId });
+  }, [deleteJokeMutation, jokes]);
 
   const isFollowing = useCallback((userId: string) => {
     return followingIds.includes(userId);
@@ -986,10 +1101,9 @@ export const [AppProvider, useApp] = createContextHook(() => {
     addReaction,
     rateJoke,
     addJoke,
+    updateJokeCommentsCount,
     deleteJoke,
     isDeletingJoke: deleteJokeMutation.isPending,
-    updateProfile,
-    isUpdatingProfile: updateProfileMutation.isPending,
     isFollowing,
     getJokeReactions,
     getMyRating,
@@ -1013,6 +1127,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     backendAvailable: dbReady,
     directDBAvailable: dbReady,
     refreshJokes,
+    totalUsers,
     isLoading: authQuery.isLoading,
     isRegistering: authMutation.isPending && (authMutation.variables as any)?.type === 'register',
     isLoggingIn: authMutation.isPending && (authMutation.variables as any)?.type === 'login',
@@ -1027,21 +1142,14 @@ export const [AppProvider, useApp] = createContextHook(() => {
   }), [
     currentUser, isAuthenticated, authChecked, authError, jokes, followingIds,
     playingJokeId, playJoke, pauseAudio, globalAudioStatus,
-<<<<<<< HEAD
-    login, register, logout, deleteAccount, toggleFollow,
-    addReaction, rateJoke, addJoke, deleteJoke, deleteJokeMutation.isPending,
-    updateProfile, updateProfileMutation.isPending,
-    isFollowing, getJokeReactions, getMyRating,
-=======
     login, register, logout, deleteAccount, updateProfile, updateProfileMutation.isPending, toggleFollow,
-    addReaction, rateJoke, addJoke, deleteJoke, deleteJokeMutation.isPending, isFollowing, getJokeReactions, getMyRating,
->>>>>>> 3c7bb6170c59bfb1bd419b27ad8a2da319f98f6f
+    addReaction, rateJoke, addJoke, updateJokeCommentsCount, deleteJoke, deleteJokeMutation.isPending, isFollowing, getJokeReactions, getMyRating,
     totalReactions, isSubscribed, subscriptionPlan, subscribe,
     listenCount, createCount, incrementListenCount, incrementCreateCount,
     canListen, canCreate, sendTip, getTipsForUser, tipsBalance,
     isAdmin, toggleAdmin,
     settings, updateSettings, dbReady,
-    refreshJokes, authQuery.isLoading, authMutation.isPending, authMutation.variables,
+    refreshJokes, totalUsers, authQuery.isLoading, authMutation.isPending, authMutation.variables,
     logoutMutation.isPending, deleteMutation.isPending,
     requestPasswordReset, confirmPasswordReset,
     requestPasswordResetMutation.isPending, confirmPasswordResetMutation.isPending,

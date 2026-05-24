@@ -50,6 +50,12 @@ export default function AuthScreen() {
 
 
   useEffect(() => {
+    if (isPasswordRecovery) {
+      setMode('login');
+    }
+  }, [isPasswordRecovery]);
+
+  useEffect(() => {
     Animated.sequence([
       Animated.spring(logoScale, {
         toValue: 1,
@@ -138,11 +144,11 @@ export default function AuthScreen() {
 
   const handleSetNewPassword = async () => {
     if (newPassword.length < 6) {
-      Alert.alert('Erreur', 'Le mot de passe doit contenir au moins 6 caractères');
+      Alert.alert(t('settings.passwordTooShort'), t('settings.passwordTooShortMsg'));
       return;
     }
     if (newPassword !== confirmNewPassword) {
-      Alert.alert('Erreur', 'Les mots de passe ne correspondent pas');
+      Alert.alert(t('settings.passwordMismatch'), t('settings.passwordMismatchMsg'));
       return;
     }
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -152,15 +158,15 @@ export default function AuthScreen() {
       setNewPassword('');
       setConfirmNewPassword('');
       Alert.alert(
-        'Mot de passe mis à jour !',
-        'Votre mot de passe a été réinitialisé avec succès. Veuillez vous connecter.',
+        t('auth.passwordChanged'),
+        t('auth.passwordChangedMsg'),
         [{ text: 'OK', onPress: () => {
           setIsPasswordRecovery(false);
           setMode('login');
         }}]
       );
     } catch (err: any) {
-      Alert.alert(t('auth.error'), err.message || 'Erreur lors de la mise à jour');
+      Alert.alert(t('auth.error'), err.message || t('auth.passwordUpdateError'));
     }
   };
 
@@ -232,8 +238,8 @@ export default function AuthScreen() {
         <View style={styles.emailSentIcon}>
           <Lock size={32} color={Colors.primary} />
         </View>
-        <Text style={styles.formTitle}>Nouveau mot de passe</Text>
-        <Text style={styles.formSubtitle}>Choisissez un nouveau mot de passe sécurisé pour votre compte.</Text>
+        <Text style={styles.formTitle}>{t('auth.newPassword')}</Text>
+        <Text style={styles.formSubtitle}>{t('auth.setNewPasswordDesc')}</Text>
       </View>
 
       <View style={styles.inputGroup}>
@@ -242,7 +248,7 @@ export default function AuthScreen() {
         </View>
         <TextInput
           style={styles.inputPassword}
-          placeholder="Nouveau mot de passe"
+          placeholder={t('auth.newPassword')}
           placeholderTextColor={Colors.textMuted}
           value={newPassword}
           onChangeText={setNewPassword}
@@ -260,7 +266,7 @@ export default function AuthScreen() {
         </View>
         <TextInput
           style={styles.inputPassword}
-          placeholder="Confirmer le mot de passe"
+          placeholder={t('settings.confirmNewPassword')}
           placeholderTextColor={Colors.textMuted}
           value={confirmNewPassword}
           onChangeText={setConfirmNewPassword}
@@ -280,7 +286,7 @@ export default function AuthScreen() {
         {isConfirmingReset ? (
           <ActivityIndicator color={Colors.accent} />
         ) : (
-          <Text style={styles.submitBtnText}>Enregistrer le mot de passe</Text>
+          <Text style={styles.submitBtnText}>{t('auth.savePassword')}</Text>
         )}
       </TouchableOpacity>
     </Animated.View>

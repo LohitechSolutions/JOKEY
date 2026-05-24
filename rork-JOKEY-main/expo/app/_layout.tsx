@@ -15,7 +15,7 @@ void SplashScreen.preventAutoHideAsync();
 const queryClient = new QueryClient();
 
 function RootLayoutNav() {
-  const { isAuthenticated, authChecked } = useApp();
+  const { isAuthenticated, authChecked, isPasswordRecovery } = useApp();
   const router = useRouter();
   const segments = useSegments();
 
@@ -24,14 +24,20 @@ function RootLayoutNav() {
 
     const inAuthScreen = segments[0] === 'auth';
 
+    if (isPasswordRecovery && !inAuthScreen) {
+      console.log('[RootLayout] Password recovery — redirecting to auth');
+      router.replace('/auth');
+      return;
+    }
+
     if (!isAuthenticated && !inAuthScreen) {
       console.log('[RootLayout] Not authenticated, redirecting to auth');
       router.replace('/auth');
-    } else if (isAuthenticated && inAuthScreen) {
+    } else if (isAuthenticated && inAuthScreen && !isPasswordRecovery) {
       console.log('[RootLayout] Authenticated, redirecting to home');
       router.replace('/');
     }
-  }, [isAuthenticated, authChecked, segments, router]);
+  }, [isAuthenticated, authChecked, isPasswordRecovery, segments, router]);
 
   if (!authChecked) {
     return (

@@ -37,6 +37,9 @@ export default function ProfileScreen() {
     return jokes.filter(j => j.userId === currentUser?.id);
   }, [jokes, currentUser]);
 
+  const displayedJokesCount = Math.max(myJokes.length, currentUser?.jokesCount ?? 0);
+  const displayedFollowersCount = currentUser?.followersCount ?? 0;
+
   const handleDeleteJoke = useCallback((jokeId: string, audioUri: string) => {
     Alert.alert(
       t('profile.deleteJoke'),
@@ -197,7 +200,7 @@ export default function ProfileScreen() {
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
             <Mic size={16} color={Colors.primary} />
-            <Text style={styles.statValue}>{currentUser.jokesCount}</Text>
+            <Text style={styles.statValue}>{displayedJokesCount}</Text>
             <Text style={styles.statLabel}>{t('profile.jokes')}</Text>
           </View>
           <View style={styles.statDivider} />
@@ -209,7 +212,7 @@ export default function ProfileScreen() {
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
             <Users size={16} color={Colors.primary} />
-            <Text style={styles.statValue}>{currentUser.followersCount}</Text>
+            <Text style={styles.statValue}>{displayedFollowersCount}</Text>
             <Text style={styles.statLabel}>{t('profile.followers')}</Text>
           </View>
 

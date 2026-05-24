@@ -11,15 +11,18 @@ import {
   Platform,
   Share,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Play, Pause, Send, Clock, ArrowLeft, Share2 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useApp } from '@/contexts/AppContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { CATEGORIES, REACTION_EMOJIS } from '@/mocks/data';
-import { ReactionEmoji } from '@/types';
+import { ReactionEmoji, Comment } from '@/types';
+import { addCommentToDB, fetchCommentsFromDB } from '@/lib/db-client';
 
 function formatDuration(seconds: number): string {
   const mins = Math.floor(seconds / 60);
@@ -42,8 +45,11 @@ function timeAgo(dateStr: string, tFn: (key: string, params?: Record<string, str
 export default function JokeDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const {
     jokes,
+    currentUser,
+    isAuthenticated,
     playingJokeId,
     playJoke,
     pauseAudio,
@@ -51,6 +57,7 @@ export default function JokeDetailScreen() {
     addReaction,
     getJokeReactions,
     totalReactions,
+    updateJokeCommentsCount,
   } = useApp();
   const [commentText, setCommentText] = useState('');
 
@@ -58,6 +65,29 @@ export default function JokeDetailScreen() {
   const joke = useMemo(() => jokes.find(j => j.id === id), [jokes, id]);
   const myReactions = joke ? getJokeReactions(joke.id) : [];
   const category = joke ? CATEGORIES.find(c => c.id === joke.category) : null;
+
+  const commentsQuery = useQuery({
+    queryKey: ['joke-comments', id],
+    queryFn: () => fetchCommentsFromDB(id!),
+    enabled: Boolean(id),
+  });
+
+  const comments = commentsQuery.data ?? [];
+  const commentsCount = joke?.commentsCount ?? comments.length;
+
+  const addCommentMutation = useMutation({
+    mutationFn: async (text: string) => {
+      if (!joke || !currentUser) {
+        throw new Error(t('joke.loginToCommentMsg'));
+      }
+      return addCommentToDB(joke.id, currentUser, text);
+    },
+    onSuccess: (newComment) => {
+      queryClient.setQueryData<Comment[]>(['joke-comments', id], (prev = []) => [newComment, ...prev]);
+      updateJokeCommentsCount(joke!.id, commentsCount + 1);
+      setCommentText('');
+    },
+  });
 
   const isThisJokePlaying = playingJokeId === id;
   const isPlaying = isThisJokePlaying && globalAudioStatus.playing;
@@ -82,12 +112,27 @@ export default function JokeDetailScreen() {
     addReaction({ jokeId: joke.id, emoji });
   }, [joke, addReaction]);
 
-  const handleSendComment = useCallback(() => {
-    if (!commentText.trim()) return;
+  const handleSendComment = useCallback(async () => {
+    const text = commentText.trim();
+    if (!text) return;
+
+    if (!isAuthenticated || !currentUser) {
+      Alert.alert(t('joke.loginToComment'), t('joke.loginToCommentMsg'), [
+        { text: t('common.back'), style: 'cancel' },
+        { text: t('auth.login'), onPress: () => router.push('/auth') },
+      ]);
+      return;
+    }
+
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setCommentText('');
-    Alert.alert(t('joke.commentSent'), t('joke.commentSentMsg'));
-  }, [commentText, t]);
+    try {
+      await addCommentMutation.mutateAsync(text);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert(t('joke.commentSent'), t('joke.commentSentMsg'));
+    } catch (err: any) {
+      Alert.alert(t('auth.error'), err?.message || t('joke.commentError'));
+    }
+  }, [commentText, isAuthenticated, currentUser, addCommentMutation, t, router]);
 
   const handleShare = useCallback(async () => {
     if (!joke) return;
@@ -224,11 +269,28 @@ export default function JokeDetailScreen() {
         </View>
 
         <View style={styles.commentsSection}>
-          <Text style={styles.sectionLabel}>{t('joke.comments')} (0)</Text>
-          <View style={styles.noComments}>
-            <Text style={styles.noCommentsEmoji}>💬</Text>
-            <Text style={styles.noCommentsText}>{t('joke.firstComment')}</Text>
-          </View>
+          <Text style={styles.sectionLabel}>{t('joke.comments')} ({commentsCount})</Text>
+          {commentsQuery.isLoading ? (
+            <ActivityIndicator color={Colors.primary} style={styles.commentsLoading} />
+          ) : comments.length === 0 ? (
+            <View style={styles.noComments}>
+              <Text style={styles.noCommentsEmoji}>💬</Text>
+              <Text style={styles.noCommentsText}>{t('joke.firstComment')}</Text>
+            </View>
+          ) : (
+            comments.map((comment) => (
+              <View key={comment.id} style={styles.commentCard}>
+                <Image source={{ uri: comment.user.avatar }} style={styles.commentAvatar} />
+                <View style={styles.commentBody}>
+                  <View style={styles.commentHeader}>
+                    <Text style={styles.commentUser}>@{comment.user.username}</Text>
+                    <Text style={styles.commentTime}>{timeAgo(comment.createdAt, t)}</Text>
+                  </View>
+                  <Text style={styles.commentText}>{comment.text}</Text>
+                </View>
+              </View>
+            ))
+          )}
         </View>
       </ScrollView>
 
@@ -241,13 +303,18 @@ export default function JokeDetailScreen() {
             placeholder={t('joke.writeComment')}
             placeholderTextColor={Colors.textMuted}
             maxLength={200}
+            editable={!addCommentMutation.isPending}
           />
           <TouchableOpacity
-            style={[styles.sendBtn, !commentText.trim() && styles.sendBtnDisabled]}
+            style={[styles.sendBtn, (!commentText.trim() || addCommentMutation.isPending) && styles.sendBtnDisabled]}
             onPress={handleSendComment}
-            disabled={!commentText.trim()}
+            disabled={!commentText.trim() || addCommentMutation.isPending}
           >
-            <Send size={18} color={commentText.trim() ? Colors.white : Colors.textMuted} />
+            {addCommentMutation.isPending ? (
+              <ActivityIndicator size="small" color={Colors.white} />
+            ) : (
+              <Send size={18} color={commentText.trim() ? Colors.white : Colors.textMuted} />
+            )}
           </TouchableOpacity>
         </View>
       )}
@@ -478,6 +545,9 @@ const styles = StyleSheet.create({
   },
   commentsSection: {
     paddingHorizontal: 20,
+  },
+  commentsLoading: {
+    paddingVertical: 24,
   },
   commentCard: {
     flexDirection: 'row',

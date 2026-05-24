@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -9,6 +9,7 @@ import {
   Image,
   Modal,
   Pressable,
+  Alert,
 } from 'react-native';
 import { Shuffle, ChevronDown, Check } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
@@ -16,8 +17,32 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Colors from '@/constants/colors';
 import { useApp } from '@/contexts/AppContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { FeedTab } from '@/types';
+import { FeedTab, Joke } from '@/types';
 import JokeCard from '@/components/JokeCard';
+
+function isToday(dateStr: string): boolean {
+  const date = new Date(dateStr);
+  const now = new Date();
+  return (
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate()
+  );
+}
+
+function getLastRecordedJokeOfDay(allJokes: Joke[]): Joke | null {
+  const todayJokes = allJokes
+    .filter(j => isToday(j.createdAt))
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  if (todayJokes.length > 0) return todayJokes[0];
+
+  const jokeOfDay = allJokes
+    .filter(j => j.isJokeOfDay)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  return jokeOfDay[0] ?? null;
+}
 
 const FEED_TABS: { id: FeedTab; tKey: string; emoji: string }[] = [
   { id: 'jour', tKey: 'feed.day', emoji: '🔥' },
@@ -28,11 +53,20 @@ const FEED_TABS: { id: FeedTab; tKey: string; emoji: string }[] = [
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const { jokes, followingIds } = useApp();
+  const {
+    jokes,
+    followingIds,
+    totalUsers,
+    refreshJokes,
+    playJoke,
+    incrementListenCount,
+  } = useApp();
   const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<FeedTab>('jour');
   const [refreshing, setRefreshing] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [pendingScrollJokeId, setPendingScrollJokeId] = useState<string | null>(null);
+  const listRef = useRef<FlatList<Joke>>(null);
 
   const filteredJokes = useMemo(() => {
     switch (activeTab) {
@@ -55,8 +89,6 @@ export default function HomeScreen() {
     }
   }, [activeTab, jokes, followingIds]);
 
-  const { refreshJokes } = useApp();
-
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     try {
@@ -70,7 +102,32 @@ export default function HomeScreen() {
 
   const handleSurprise = useCallback(() => {
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  }, []);
+
+    const surpriseJoke = getLastRecordedJokeOfDay(jokes);
+    if (!surpriseJoke) {
+      Alert.alert(t('home.surprise.emptyTitle'), t('home.surprise.emptyMessage'));
+      return;
+    }
+
+    setActiveTab('nouveautes');
+    setPendingScrollJokeId(surpriseJoke.id);
+    playJoke(surpriseJoke);
+    incrementListenCount();
+  }, [jokes, playJoke, incrementListenCount, t]);
+
+  useEffect(() => {
+    if (!pendingScrollJokeId) return;
+
+    const index = filteredJokes.findIndex(j => j.id === pendingScrollJokeId);
+    if (index < 0) return;
+
+    const timer = setTimeout(() => {
+      listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.2 });
+      setPendingScrollJokeId(null);
+    }, 150);
+
+    return () => clearTimeout(timer);
+  }, [filteredJokes, pendingScrollJokeId]);
 
   const handleSelectTab = useCallback((tab: FeedTab) => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -95,6 +152,9 @@ export default function HomeScreen() {
           <View style={styles.welcomeText}>
             <Text style={styles.welcomeTitle}>{t('home.welcome')}</Text>
             <Text style={styles.welcomeSubtitle}>{t('home.subtitle')}</Text>
+            {totalUsers > 0 ? (
+              <Text style={styles.communityCount}>{t('home.communityUsers', { count: totalUsers })}</Text>
+            ) : null}
           </View>
         </View>
         <TouchableOpacity style={styles.surpriseBtn} onPress={handleSurprise}>
@@ -115,7 +175,7 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
     </View>
-  ), [handleSurprise, t, insets.top, activeTabInfo]);
+  ), [handleSurprise, t, insets.top, activeTabInfo, totalUsers]);
 
   const renderEmpty = useCallback(() => (
     <View style={styles.emptyState}>
@@ -132,6 +192,7 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       <FlatList
+        ref={listRef}
         data={filteredJokes}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => <JokeCard joke={item} />}
@@ -139,6 +200,15 @@ export default function HomeScreen() {
         ListEmptyComponent={renderEmpty}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
+        onScrollToIndexFailed={(info) => {
+          setTimeout(() => {
+            listRef.current?.scrollToIndex({
+              index: info.index,
+              animated: true,
+              viewPosition: 0.2,
+            });
+          }, 200);
+        }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -236,6 +306,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.textSecondary,
     marginTop: 2,
+  },
+  communityCount: {
+    fontSize: 11,
+    color: Colors.textMuted,
+    marginTop: 4,
   },
   surpriseBtn: {
     flexDirection: 'row',

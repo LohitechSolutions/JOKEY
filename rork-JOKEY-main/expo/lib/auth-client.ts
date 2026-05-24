@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase, isSupabaseConfigured } from './supabase';
+import { getPasswordResetRedirectUrl } from './auth-deep-link';
 import { User } from '@/types';
 import { removeAuthToken } from './auth-storage';
 
@@ -328,7 +329,7 @@ export async function clientRequestPasswordReset(email: string): Promise<{ succe
   console.log('[AuthClient] Password reset request for:', normalizedEmail);
 
   const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
-    redirectTo: 'rork-app://reset-password',
+    redirectTo: getPasswordResetRedirectUrl(),
   });
 
   if (error) {
@@ -366,6 +367,8 @@ export async function clientConfirmPasswordReset(input: {
     console.error('[AuthClient] Update password error:', error.message);
     throw new Error(error.message);
   }
+
+  await supabase.auth.signOut();
 
   return { success: true };
 }
