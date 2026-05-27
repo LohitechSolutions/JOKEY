@@ -10,9 +10,11 @@ import {
   Alert,
   Platform,
 } from 'react-native';
-import { Mic, Square, RotateCcw, Send, ChevronDown, Loader, Play, Pause } from 'lucide-react-native';
+import { Mic, Square, RotateCcw, Send, ChevronDown, Loader, Play, Pause, Video as VideoIcon, Camera as CameraIcon, FlipHorizontal } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import * as FileSystem from 'expo-file-system/legacy';
+import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import {
   useAudioRecorder,
   useAudioRecorderState,
@@ -26,10 +28,11 @@ import Colors from '@/constants/colors';
 import { CATEGORIES } from '@/mocks/data';
 import { useApp } from '@/contexts/AppContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { JokeCategory, Joke } from '@/types';
-import { createJokeInDB, uploadAudioToSupabase } from '@/lib/db-client';
+import { JokeCategory, Joke, Video } from '@/types';
+import { createJokeInDB, createVideoInDB, uploadAudioToSupabase, uploadVideoToSupabase } from '@/lib/db-client';
 
 const MAX_DURATION = 180;
+const MAX_VIDEO_DURATION = 60;
 
 // High compatibility preset for Android/iOS: Mono (1 channel) is much safer for various hardware
 const SAFE_RECORDING_PRESET = {
@@ -48,17 +51,26 @@ const SAFE_RECORDING_PRESET = {
 } as any;
 
 export default function RecordScreen() {
-  const { addJoke, currentUser, incrementCreateCount } = useApp();
+  const { addJoke, addVideo, currentUser, incrementCreateCount } = useApp();
   const { t } = useLanguage();
+  const [recordingMode, setRecordingMode] = useState<'audio' | 'video'>('audio');
   const [hasRecording, setHasRecording] = useState(false);
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
   const [recordingDuration, setRecordingDuration] = useState(0);
+  const [hasVideoRecording, setHasVideoRecording] = useState(false);
+  const [recordedVideoUri, setRecordedVideoUri] = useState<string | null>(null);
+  const [videoDuration, setVideoDuration] = useState(0);
+  const [isVideoRecording, setIsVideoRecording] = useState(false);
+  const [cameraFacing, setCameraFacing] = useState<'front' | 'back'>('front');
   const [title, setTitle] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<JokeCategory | null>(null);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [language] = useState('FR');
   const [level, setLevel] = useState<'all' | 'adult'>('all');
   const [permissionGranted, setPermissionGranted] = useState(false);
+  const cameraRef = useRef<CameraView | null>(null);
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+  const [cameraMicrophonePermission, requestCameraMicrophonePermission] = useMicrophonePermissions();
 
   const audioRecorder = useAudioRecorder(SAFE_RECORDING_PRESET);
   const recorderState = useAudioRecorderState(audioRecorder, 500);
@@ -66,6 +78,10 @@ export default function RecordScreen() {
   const previewSource = useMemo(() => recordedUri ? { uri: recordedUri } : null, [recordedUri]);
   const previewPlayer = useAudioPlayer(previewSource);
   const previewStatus = useAudioPlayerStatus(previewPlayer);
+  const videoPreviewSource = useMemo(() => recordedVideoUri ? { uri: recordedVideoUri } : null, [recordedVideoUri]);
+  const videoPreviewPlayer = useVideoPlayer(videoPreviewSource, (player) => {
+    player.loop = true;
+  });
 
   // Monitor preview player errors
   useEffect(() => {
@@ -165,6 +181,21 @@ export default function RecordScreen() {
   }, [isRecording, currentDuration]);
 
   useEffect(() => {
+    if (!isVideoRecording) return;
+
+    const startedAt = Date.now();
+    const interval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+      setVideoDuration(elapsed);
+      if (elapsed >= MAX_VIDEO_DURATION) {
+        cameraRef.current?.stopRecording();
+      }
+    }, 500);
+
+    return () => clearInterval(interval);
+  }, [isVideoRecording]);
+
+  useEffect(() => {
     if (isRecording && currentDuration >= MAX_DURATION) {
       console.log('[Record] Max duration reached, stopping');
       void stopRecordingRef.current();
@@ -231,6 +262,90 @@ export default function RecordScreen() {
     setSelectedCategory(null);
     progressAnim.setValue(0);
   }, [progressAnim]);
+
+  const resetVideoRecording = useCallback(() => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (videoPreviewPlayer.playing) {
+      videoPreviewPlayer.pause();
+    }
+    setHasVideoRecording(false);
+    setRecordedVideoUri(null);
+    setVideoDuration(0);
+    setTitle('');
+    setSelectedCategory(null);
+  }, [videoPreviewPlayer]);
+
+  const startVideoRecording = useCallback(async () => {
+    try {
+      if (!cameraPermission?.granted) {
+        const status = await requestCameraPermission();
+        if (!status.granted) {
+          Alert.alert(t('record.error'), t('record.cameraPermissionRequired'));
+          return;
+        }
+      }
+
+      if (!cameraMicrophonePermission?.granted) {
+        const status = await requestCameraMicrophonePermission();
+        if (!status.granted) {
+          Alert.alert(t('record.error'), t('record.microphonePermissionRequired'));
+          return;
+        }
+      }
+
+      if (!cameraRef.current) {
+        Alert.alert(t('record.error'), t('record.cameraUnavailable'));
+        return;
+      }
+
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      setHasVideoRecording(false);
+      setRecordedVideoUri(null);
+      setVideoDuration(0);
+      setIsVideoRecording(true);
+
+      const startedAt = Date.now();
+      const result = await cameraRef.current.recordAsync({ maxDuration: MAX_VIDEO_DURATION });
+      if (result?.uri) {
+        const duration = Math.max(1, Math.floor((Date.now() - startedAt) / 1000));
+        if (Platform.OS === 'android') {
+          try {
+            const fileInfo = await FileSystem.getInfoAsync(result.uri);
+            if (!fileInfo.exists || (fileInfo.size && fileInfo.size < 1000)) {
+              Alert.alert(t('record.error'), t('record.videoEmpty'));
+              setHasVideoRecording(false);
+              return;
+            }
+          } catch (err) {
+            console.log('[Record] Error checking video file info:', err);
+          }
+        }
+        setRecordedVideoUri(result.uri);
+        setHasVideoRecording(true);
+        setVideoDuration(Math.min(duration, MAX_VIDEO_DURATION));
+      }
+    } catch (error) {
+      console.error('[Record] Failed to record video:', error);
+      Alert.alert(t('record.error'), t('record.videoErrorMsg'));
+    } finally {
+      setIsVideoRecording(false);
+    }
+  }, [
+    cameraPermission?.granted,
+    cameraMicrophonePermission?.granted,
+    requestCameraPermission,
+    requestCameraMicrophonePermission,
+    t,
+  ]);
+
+  const stopVideoRecording = useCallback(() => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    cameraRef.current?.stopRecording();
+  }, []);
+
+  const toggleCameraFacing = useCallback(() => {
+    setCameraFacing(prev => (prev === 'front' ? 'back' : 'front'));
+  }, []);
 
   const [isUploading, setIsUploading] = useState(false);
 
@@ -316,6 +431,88 @@ export default function RecordScreen() {
     }
   }, [selectedCategory, recordingDuration, title, language, level, currentUser, addJoke, resetRecording, t, recordedUri, incrementCreateCount]);
 
+  const publishVideo = useCallback(async () => {
+    if (!selectedCategory) {
+      Alert.alert(t('record.categoryRequired'), t('record.categoryRequiredMsg'));
+      return;
+    }
+    if (videoDuration < 3) {
+      Alert.alert(t('record.tooShort'), t('record.videoTooShortMsg'));
+      return;
+    }
+    if (!currentUser) return;
+    if (!recordedVideoUri) {
+      Alert.alert(t('record.error'), t('record.noVideoRecorded'));
+      return;
+    }
+
+    setIsUploading(true);
+
+    try {
+      const videoId = `v_${Date.now()}`;
+      console.log('[Record] Uploading video:', videoId);
+
+      let videoUrl = recordedVideoUri;
+      try {
+        videoUrl = await uploadVideoToSupabase(recordedVideoUri, videoId);
+        console.log('[Record] Video uploaded, public URL:', videoUrl);
+      } catch (uploadErr) {
+        console.warn('[Record] Video upload failed, using local URI:', uploadErr);
+      }
+
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      const newVideo: Video = {
+        id: videoId,
+        userId: currentUser.id,
+        user: currentUser,
+        title: title || t('record.videoUntitled'),
+        videoUri: videoUrl,
+        duration: videoDuration,
+        category: selectedCategory,
+        tags: [],
+        language,
+        level,
+        allowComments: true,
+        reactions: { '😂': 0, '🤣': 0, '😭': 0, '💀': 0, '👏': 0, '❤️': 0 },
+        commentsCount: 0,
+        createdAt: new Date().toISOString(),
+        isTrending: false,
+        averageRating: 0,
+        totalRatings: 0,
+      };
+
+      addVideo(newVideo);
+      incrementCreateCount();
+
+      createVideoInDB({
+        id: newVideo.id,
+        userId: currentUser.id,
+        title: newVideo.title,
+        videoUri: videoUrl,
+        thumbnailUri: newVideo.thumbnailUri,
+        duration: newVideo.duration,
+        category: newVideo.category,
+        tags: newVideo.tags,
+        language: newVideo.language,
+        level: newVideo.level,
+        allowComments: newVideo.allowComments,
+      }, currentUser).then(() => {
+        console.log('[Record] Video saved to Supabase');
+      }).catch((err) => {
+        console.warn('[Record] Failed to save video to Supabase (local only):', err);
+      });
+
+      Alert.alert(t('record.videoPublished'), t('record.videoPublishedMsg'));
+      resetVideoRecording();
+    } catch (err) {
+      console.error('[Record] Publish video error:', err);
+      Alert.alert(t('record.error'), t('record.videoPublishError'));
+    } finally {
+      setIsUploading(false);
+    }
+  }, [selectedCategory, videoDuration, currentUser, recordedVideoUri, title, language, level, t, addVideo, incrementCreateCount, resetVideoRecording]);
+
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
@@ -327,6 +524,29 @@ export default function RecordScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <View style={styles.modeToggle}>
+        <TouchableOpacity
+          style={[styles.modeBtn, recordingMode === 'audio' && styles.modeBtnActive]}
+          onPress={() => setRecordingMode('audio')}
+        >
+          <Mic size={18} color={recordingMode === 'audio' ? Colors.accent : Colors.textSecondary} />
+          <Text style={[styles.modeText, recordingMode === 'audio' && styles.modeTextActive]}>
+            {t('record.audioMode')}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.modeBtn, recordingMode === 'video' && styles.modeBtnActive]}
+          onPress={() => setRecordingMode('video')}
+        >
+          <VideoIcon size={18} color={recordingMode === 'video' ? Colors.accent : Colors.textSecondary} />
+          <Text style={[styles.modeText, recordingMode === 'video' && styles.modeTextActive]}>
+            {t('record.videoMode')}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {recordingMode === 'audio' ? (
+        <>
       <View style={styles.recordSection}>
         <View style={styles.timerContainer}>
           <Text style={[styles.timer, isRecording && styles.timerActive]}>
@@ -512,10 +732,177 @@ export default function RecordScreen() {
               <Send size={20} color={Colors.accent} />
             )}
             <Text style={styles.publishBtnText}>
-              {isUploading ? 'Publication...' : t('record.publish')}
+              {isUploading ? t('record.publishing') : t('record.publish')}
             </Text>
           </TouchableOpacity>
         </View>
+      )}
+        </>
+      ) : (
+        <>
+          <View style={styles.videoSection}>
+            <View style={styles.timerContainer}>
+              <Text style={[styles.timer, isVideoRecording && styles.timerActive]}>
+                {formatTime(videoDuration)}
+              </Text>
+              <Text style={styles.maxDuration}>/ {formatTime(MAX_VIDEO_DURATION)}</Text>
+            </View>
+
+            <View style={styles.cameraContainer}>
+              {hasVideoRecording && recordedVideoUri ? (
+                <VideoView
+                  style={styles.cameraPreview}
+                  player={videoPreviewPlayer}
+                  allowsFullscreen
+                  contentFit="cover"
+                  nativeControls
+                />
+              ) : (
+                <CameraView
+                  ref={cameraRef}
+                  style={styles.cameraPreview}
+                  facing={cameraFacing}
+                  mode="video"
+                  mute={false}
+                  active={recordingMode === 'video'}
+                />
+              )}
+            </View>
+
+            <View style={styles.buttonRow}>
+              {!hasVideoRecording && (
+                <TouchableOpacity style={styles.secondaryBtn} onPress={toggleCameraFacing} disabled={isVideoRecording}>
+                  <FlipHorizontal size={22} color={Colors.textSecondary} />
+                </TouchableOpacity>
+              )}
+
+              <TouchableOpacity
+                style={[
+                  styles.recordButton,
+                  isVideoRecording && styles.recordButtonActive,
+                  hasVideoRecording && !isVideoRecording && styles.recordButtonDone,
+                ]}
+                onPress={isVideoRecording ? stopVideoRecording : startVideoRecording}
+                testID="video-record-button"
+              >
+                {isVideoRecording ? (
+                  <Square size={28} color={Colors.white} fill={Colors.white} />
+                ) : (
+                  <CameraIcon size={32} color="#1565C0" />
+                )}
+              </TouchableOpacity>
+
+              {hasVideoRecording && !isVideoRecording && (
+                <TouchableOpacity style={styles.secondaryBtn} onPress={resetVideoRecording}>
+                  <RotateCcw size={22} color={Colors.textSecondary} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <Text style={styles.hint}>
+              {isVideoRecording
+                ? t('record.tapToStopVideo')
+                : hasVideoRecording
+                ? t('record.videoDone')
+                : t('record.tapToRecordVideo')}
+            </Text>
+          </View>
+
+          {hasVideoRecording && !isVideoRecording && (
+            <View style={styles.publishSection}>
+              <Text style={styles.sectionTitle}>{t('record.publishVideoTitle')}</Text>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>{t('record.titleOptional')}</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={title}
+                  onChangeText={setTitle}
+                  placeholder={t('record.videoTitlePlaceholder')}
+                  placeholderTextColor={Colors.textMuted}
+                  maxLength={60}
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>{t('record.category')}</Text>
+                <TouchableOpacity
+                  style={styles.pickerBtn}
+                  onPress={() => setShowCategoryPicker(!showCategoryPicker)}
+                >
+                  <Text style={selectedCategory ? styles.pickerText : styles.pickerPlaceholder}>
+                    {selectedCategory
+                      ? CATEGORIES.find(c => c.id === selectedCategory)?.emoji + ' ' +
+                        CATEGORIES.find(c => c.id === selectedCategory)?.name
+                      : t('record.selectCategory')}
+                  </Text>
+                  <ChevronDown size={18} color={Colors.textMuted} />
+                </TouchableOpacity>
+                {showCategoryPicker && (
+                  <View style={styles.categoryGrid}>
+                    {CATEGORIES.map(cat => (
+                      <TouchableOpacity
+                        key={cat.id}
+                        style={[
+                          styles.categoryChip,
+                          selectedCategory === cat.id && { backgroundColor: cat.color + '20', borderColor: cat.color },
+                        ]}
+                        onPress={() => {
+                          setSelectedCategory(cat.id);
+                          setShowCategoryPicker(false);
+                        }}
+                      >
+                        <Text style={styles.chipEmoji}>{cat.emoji}</Text>
+                        <Text style={[
+                          styles.chipText,
+                          selectedCategory === cat.id && { color: cat.color },
+                        ]}>{cat.name}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>{t('record.level')}</Text>
+                <View style={styles.levelRow}>
+                  <TouchableOpacity
+                    style={[styles.levelBtn, level === 'all' && styles.levelBtnActive]}
+                    onPress={() => setLevel('all')}
+                  >
+                    <Text style={[styles.levelText, level === 'all' && styles.levelTextActive]}>
+                      {t('record.allPublic')}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.levelBtn, level === 'adult' && styles.levelBtnActive]}
+                    onPress={() => setLevel('adult')}
+                  >
+                    <Text style={[styles.levelText, level === 'adult' && styles.levelTextActive]}>
+                      {t('record.adult')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={[styles.publishBtn, isUploading && styles.publishBtnDisabled]}
+                onPress={publishVideo}
+                disabled={isUploading}
+                testID="publish-video-button"
+              >
+                {isUploading ? (
+                  <Loader size={20} color={Colors.accent} />
+                ) : (
+                  <Send size={20} color={Colors.accent} />
+                )}
+                <Text style={styles.publishBtnText}>
+                  {isUploading ? t('record.publishing') : t('record.publishVideo')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </>
       )}
     </ScrollView>
   );
@@ -529,11 +916,62 @@ const styles = StyleSheet.create({
   content: {
     paddingBottom: 120,
   },
+  modeToggle: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 6,
+  },
+  modeBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 16,
+    backgroundColor: Colors.card,
+    borderWidth: 1.5,
+    borderColor: Colors.cardBorder,
+  },
+  modeBtnActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  modeText: {
+    fontSize: 14,
+    fontWeight: '700' as const,
+    color: Colors.textSecondary,
+  },
+  modeTextActive: {
+    color: Colors.accent,
+  },
   recordSection: {
     alignItems: 'center',
     paddingTop: 30,
     paddingBottom: 20,
     paddingHorizontal: 24,
+  },
+  videoSection: {
+    alignItems: 'center',
+    paddingTop: 24,
+    paddingBottom: 20,
+    paddingHorizontal: 24,
+  },
+  cameraContainer: {
+    width: '100%',
+    height: 430,
+    borderRadius: 24,
+    overflow: 'hidden',
+    backgroundColor: Colors.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: Colors.cardBorder,
+    marginBottom: 24,
+  },
+  cameraPreview: {
+    width: '100%',
+    height: '100%',
   },
   timerContainer: {
     flexDirection: 'row',

@@ -3,13 +3,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import createContextHook from '@nkzw/create-context-hook';
 import { Platform } from 'react-native';
-import { User, Joke, ReactionEmoji, SubscriptionPlan } from '@/types';
+import { User, Joke, Video, ReactionEmoji, SubscriptionPlan } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { setCachedUser, getCachedUser } from '@/lib/auth-storage';
 import { clientRegister, clientLogin, clientDeleteAccount, clientRequestPasswordReset, clientConfirmPasswordReset, signOutSupabase, clientGetMe } from '@/lib/auth-client';
 import { handleAuthDeepLink } from '@/lib/auth-deep-link';
 import * as Linking from 'expo-linking';
-import { ensureDBReady, fetchJokesFromDB, toggleReactionInDB, rateJokeInDB, toggleFollowInDB, deleteJokeFromDB, ensureUserRecordExists, uploadAvatarToSupabase, updateUserProfileInDB, refreshUserProfileStats, fetchFollowingIdsFromDB, fetchTotalUserCount } from '@/lib/db-client';
+import { ensureDBReady, fetchJokesFromDB, fetchVideosFromDB, toggleReactionInDB, rateJokeInDB, toggleFollowInDB, deleteJokeFromDB, deleteVideoFromDB, ensureUserRecordExists, uploadAvatarToSupabase, updateUserProfileInDB, refreshUserProfileStats, fetchFollowingIdsFromDB, fetchTotalUserCount } from '@/lib/db-client';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 
@@ -51,6 +51,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const [authChecked, setAuthChecked] = useState<boolean>(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [jokes, setJokes] = useState<Joke[]>([]);
+  const [videos, setVideos] = useState<Video[]>([]);
   const [followingIds, setFollowingIds] = useState<string[]>([]);
   const [myReactions, setMyReactions] = useState<Record<string, ReactionEmoji[]>>({});
   const [myRatings, setMyRatings] = useState<Record<string, number>>({});
@@ -248,6 +249,17 @@ export const [AppProvider, useApp] = createContextHook(() => {
     staleTime: 60 * 1000,
   });
 
+  const videosQuery = useQuery({
+    queryKey: ['videos-list'],
+    queryFn: async () => {
+      console.log('[AppContext] Fetching videos from Supabase...');
+      return fetchVideosFromDB();
+    },
+    enabled: dbReady,
+    retry: 1,
+    staleTime: 60 * 1000,
+  });
+
   useEffect(() => {
     if (authQuery.isFetched) {
       if (authQuery.data && isPasswordRecoveryResult(authQuery.data)) {
@@ -371,6 +383,13 @@ export const [AppProvider, useApp] = createContextHook(() => {
       console.log('[AppContext] Loaded', jokesQuery.data.length, 'jokes from Supabase');
     }
   }, [jokesQuery.data]);
+
+  useEffect(() => {
+    if (videosQuery.data && videosQuery.data.length > 0) {
+      setVideos(videosQuery.data);
+      console.log('[AppContext] Loaded', videosQuery.data.length, 'videos from Supabase');
+    }
+  }, [videosQuery.data]);
 
   const subscriptionQuery = useQuery({
     queryKey: ['subscription-local'],
@@ -822,6 +841,13 @@ export const [AppProvider, useApp] = createContextHook(() => {
     }
   }, [currentUser]);
 
+  const addVideo = useCallback((video: Video) => {
+    setVideos(prev => [video, ...prev]);
+    if (currentUser && video.userId === currentUser.id) {
+      setCurrentUser(prev => prev ? { ...prev, jokesCount: prev.jokesCount + 1 } : prev);
+    }
+  }, [currentUser]);
+
   const updateJokeCommentsCount = useCallback((jokeId: string, count: number) => {
     setJokes(prev => prev.map(j => (j.id === jokeId ? { ...j, commentsCount: count } : j)));
   }, []);
@@ -851,6 +877,32 @@ export const [AppProvider, useApp] = createContextHook(() => {
     const ownerId = jokes.find(j => j.id === jokeId)?.userId;
     deleteJokeMutation.mutate({ jokeId, audioUri, ownerId });
   }, [deleteJokeMutation, jokes]);
+
+  const deleteVideoMutation = useMutation({
+    mutationFn: async ({ videoId, videoUri, ownerId }: { videoId: string; videoUri: string; ownerId?: string }) => {
+      if (dbReady) {
+        await deleteVideoFromDB(videoId, videoUri);
+      }
+      return { videoId, ownerId };
+    },
+    onSuccess: ({ videoId, ownerId }) => {
+      setVideos(prev => prev.filter(v => v.id !== videoId));
+      if (ownerId && currentUser?.id === ownerId) {
+        setCurrentUser(prev => prev
+          ? { ...prev, jokesCount: Math.max(0, prev.jokesCount - 1) }
+          : prev);
+      }
+      console.log('[AppContext] Video deleted:', videoId);
+    },
+    onError: (error: Error) => {
+      console.error('[AppContext] Delete video error:', error.message);
+    },
+  });
+
+  const deleteVideo = useCallback((videoId: string, videoUri: string) => {
+    const ownerId = videos.find(v => v.id === videoId)?.userId;
+    deleteVideoMutation.mutate({ videoId, videoUri, ownerId });
+  }, [deleteVideoMutation, videos]);
 
   const isFollowing = useCallback((userId: string) => {
     return followingIds.includes(userId);
@@ -969,6 +1021,10 @@ export const [AppProvider, useApp] = createContextHook(() => {
     void queryClient.invalidateQueries({ queryKey: ['jokes-list'] });
   }, [queryClient]);
 
+  const refreshVideos = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ['videos-list'] });
+  }, [queryClient]);
+
   // ─── Global audio play / pause ────────────────────────────────────────────
 
   // When audio finishes, clear playing state
@@ -1085,6 +1141,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     authChecked,
     authError,
     jokes,
+    videos,
     followingIds,
     playingJokeId,
     setPlayingJokeId,
@@ -1101,9 +1158,12 @@ export const [AppProvider, useApp] = createContextHook(() => {
     addReaction,
     rateJoke,
     addJoke,
+    addVideo,
     updateJokeCommentsCount,
     deleteJoke,
+    deleteVideo,
     isDeletingJoke: deleteJokeMutation.isPending,
+    isDeletingVideo: deleteVideoMutation.isPending,
     isFollowing,
     getJokeReactions,
     getMyRating,
@@ -1127,6 +1187,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     backendAvailable: dbReady,
     directDBAvailable: dbReady,
     refreshJokes,
+    refreshVideos,
     totalUsers,
     isLoading: authQuery.isLoading,
     isRegistering: authMutation.isPending && (authMutation.variables as any)?.type === 'register',
@@ -1140,16 +1201,16 @@ export const [AppProvider, useApp] = createContextHook(() => {
     isPasswordRecovery,
     setIsPasswordRecovery,
   }), [
-    currentUser, isAuthenticated, authChecked, authError, jokes, followingIds,
+    currentUser, isAuthenticated, authChecked, authError, jokes, videos, followingIds,
     playingJokeId, playJoke, pauseAudio, globalAudioStatus,
     login, register, logout, deleteAccount, updateProfile, updateProfileMutation.isPending, toggleFollow,
-    addReaction, rateJoke, addJoke, updateJokeCommentsCount, deleteJoke, deleteJokeMutation.isPending, isFollowing, getJokeReactions, getMyRating,
+    addReaction, rateJoke, addJoke, addVideo, updateJokeCommentsCount, deleteJoke, deleteVideo, deleteJokeMutation.isPending, deleteVideoMutation.isPending, isFollowing, getJokeReactions, getMyRating,
     totalReactions, isSubscribed, subscriptionPlan, subscribe,
     listenCount, createCount, incrementListenCount, incrementCreateCount,
     canListen, canCreate, sendTip, getTipsForUser, tipsBalance,
     isAdmin, toggleAdmin,
     settings, updateSettings, dbReady,
-    refreshJokes, totalUsers, authQuery.isLoading, authMutation.isPending, authMutation.variables,
+    refreshJokes, refreshVideos, totalUsers, authQuery.isLoading, authMutation.isPending, authMutation.variables,
     logoutMutation.isPending, deleteMutation.isPending,
     requestPasswordReset, confirmPasswordReset,
     requestPasswordResetMutation.isPending, confirmPasswordResetMutation.isPending,
