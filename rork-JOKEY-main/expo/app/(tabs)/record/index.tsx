@@ -78,6 +78,7 @@ export default function RecordScreen() {
   const previewSource = useMemo(() => recordedUri ? { uri: recordedUri } : null, [recordedUri]);
   const previewPlayer = useAudioPlayer(previewSource);
   const previewStatus = useAudioPlayerStatus(previewPlayer);
+  const previewError = (previewStatus as { error?: string }).error;
   const videoPreviewSource = useMemo(() => recordedVideoUri ? { uri: recordedVideoUri } : null, [recordedVideoUri]);
   const videoPreviewPlayer = useVideoPlayer(videoPreviewSource, (player) => {
     player.loop = true;
@@ -85,11 +86,11 @@ export default function RecordScreen() {
 
   // Monitor preview player errors
   useEffect(() => {
-    if (previewStatus.error) {
-      console.error('[Record] Preview player error:', previewStatus.error);
-      Alert.alert(t('record.playbackError'), `${t('record.errorMsg')}: ${previewStatus.error}`);
+    if (previewError) {
+      console.error('[Record] Preview player error:', previewError);
+      Alert.alert(t('record.playbackError'), `${t('record.errorMsg')}: ${previewError}`);
     }
-  }, [previewStatus.error, t]);
+  }, [previewError, t]);
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const progressAnim = useRef(new Animated.Value(0)).current;
@@ -148,10 +149,16 @@ export default function RecordScreen() {
           const fileInfo = await FileSystem.getInfoAsync(uri);
           console.log('[Record] Android - Recording file info:', { 
             exists: fileInfo.exists, 
-            size: fileInfo.size,
+            size: 'size' in fileInfo ? fileInfo.size : 0,
             isDirectory: fileInfo.isDirectory 
           });
-          if (!fileInfo.exists || (fileInfo.size && fileInfo.size < 1000)) {
+          if (!fileInfo.exists) {
+            console.warn('[Record] Android - Recording file is missing');
+            Alert.alert(t('record.error'), 'Recording file is empty. Please try again.');
+            setHasRecording(false);
+            return;
+          }
+          if (fileInfo.size < 1000) {
             console.warn('[Record] Android - Recording file is empty or missing');
             Alert.alert(t('record.error'), 'Recording file is empty. Please try again.');
             setHasRecording(false);
@@ -311,7 +318,12 @@ export default function RecordScreen() {
         if (Platform.OS === 'android') {
           try {
             const fileInfo = await FileSystem.getInfoAsync(result.uri);
-            if (!fileInfo.exists || (fileInfo.size && fileInfo.size < 1000)) {
+            if (!fileInfo.exists) {
+              Alert.alert(t('record.error'), t('record.videoEmpty'));
+              setHasVideoRecording(false);
+              return;
+            }
+            if (fileInfo.size < 1000) {
               Alert.alert(t('record.error'), t('record.videoEmpty'));
               setHasVideoRecording(false);
               return;

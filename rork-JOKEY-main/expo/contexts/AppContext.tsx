@@ -1056,13 +1056,6 @@ export const [AppProvider, useApp] = createContextHook(() => {
     }
   }, [globalAudioStatus.isLoaded, globalAudioStatus.playing, globalPlayer]);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (playbackIntervalRef.current) clearInterval(playbackIntervalRef.current);
-    };
-  }, []);
-
   const playJoke = useCallback((joke: Joke) => {
     if (!joke.audioUri) {
       console.log('[Audio] No audioUri for joke:', joke.id);
