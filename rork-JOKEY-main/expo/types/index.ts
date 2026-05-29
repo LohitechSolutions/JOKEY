@@ -38,6 +38,27 @@ export interface Joke {
   totalRatings: number;
 }
 
+export interface Video {
+  id: string;
+  userId: string;
+  user: User;
+  title: string;
+  videoUri: string;
+  thumbnailUri?: string;
+  duration: number;
+  category: JokeCategory;
+  tags: string[];
+  language: string;
+  level: 'all' | 'adult';
+  allowComments: boolean;
+  reactions: ReactionCounts;
+  commentsCount: number;
+  createdAt: string;
+  isTrending: boolean;
+  averageRating: number;
+  totalRatings: number;
+}
+
 export interface ReactionCounts {
   '😂': number;
   '🤣': number;

@@ -52,6 +52,13 @@
       "expo-font",
       "expo-web-browser",
       "expo-audio",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Jokey utilise la caméra pour enregistrer vos vidéos.",
+          "microphonePermission": "Jokey utilise le micro pour enregistrer le son de vos vidéos."
+        }
+      ],
       "./plugins/withEmbedDebugBundle.js",
       "./plugins/withAndroidUploadSigning.js",
       "./plugins/withRemoveForegroundServices.js"

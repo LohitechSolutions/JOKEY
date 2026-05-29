@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from './supabase';
-import { User, Joke, ReactionEmoji, Comment } from '@/types';
+import { User, Joke, Video, ReactionEmoji, Comment } from '@/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 
@@ -303,6 +303,45 @@ function mapDbJokeToJoke(row: any, userMap: Map<string, User>): Joke {
   };
 }
 
+function mapDbVideoToVideo(row: any, userMap: Map<string, User>): Video {
+  const userId = row.user_id || '';
+  return {
+    id: row.id,
+    userId,
+    user: userMap.get(userId) || {
+      id: userId,
+      username: 'unknown',
+      displayName: 'Unknown',
+      avatar: 'https://ui-avatars.com/api/?name=U&background=1565C0&color=fff&size=150',
+      bio: '',
+      language: 'FR',
+      role: 'visitor' as const,
+      jokesCount: 0,
+      totalLikes: 0,
+      followersCount: 0,
+      followingCount: 0,
+      isFollowing: false,
+      badges: [],
+      createdAt: '',
+    },
+    title: row.title || '',
+    videoUri: row.video_uri || '',
+    thumbnailUri: row.thumbnail_uri || undefined,
+    duration: row.duration || 0,
+    category: row.category || 'courtes',
+    tags: row.tags || [],
+    language: row.language || 'FR',
+    level: row.level || 'all',
+    allowComments: row.allow_comments !== false,
+    reactions: row.reactions || { '😂': 0, '🤣': 0, '😭': 0, '💀': 0, '👏': 0, '❤️': 0 },
+    commentsCount: row.comments_count || 0,
+    createdAt: row.created_at || '',
+    isTrending: row.is_trending || false,
+    averageRating: row.average_rating || 0,
+    totalRatings: row.total_ratings || 0,
+  };
+}
+
 export async function fetchJokesFromDB(): Promise<Joke[]> {
   console.log('[DB] Fetching jokes from Supabase...');
   try {
@@ -337,6 +376,48 @@ export async function fetchJokesFromDB(): Promise<Joke[]> {
     return jokes.map((j: any) => mapDbJokeToJoke(j, userMap));
   } catch (err: any) {
     console.error('[DB] fetchJokes exception:', err?.message);
+    return [];
+  }
+}
+
+export async function fetchVideosFromDB(): Promise<Video[]> {
+  console.log('[DB] Fetching videos from Supabase...');
+  try {
+    const { data: videos, error } = await supabase
+      .from('videos')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      if (error.message.includes('does not exist') || error.code === '42P01') {
+        console.warn('[DB] videos table missing — run supabase-videos.sql');
+        return [];
+      }
+      console.warn('[DB] Error fetching videos:', error.message);
+      return [];
+    }
+
+    if (!videos || videos.length === 0) return [];
+
+    const userIds = Array.from(new Set(videos.map((v: any) => v.user_id).filter(Boolean)));
+    const userMap = new Map<string, User>();
+
+    if (userIds.length > 0) {
+      const { data: users, error: usersError } = await supabase
+        .from('users')
+        .select('*')
+        .in('id', userIds);
+
+      if (!usersError && users) {
+        for (const u of users) {
+          userMap.set(u.id, mapDbUserToUser(u));
+        }
+      }
+    }
+
+    return videos.map((v: any) => mapDbVideoToVideo(v, userMap));
+  } catch (err: any) {
+    console.error('[DB] fetchVideos exception:', err?.message);
     return [];
   }
 }
@@ -462,6 +543,54 @@ export async function uploadAudioToSupabase(localUri: string, jokeId: string): P
   }
 }
 
+export async function uploadVideoToSupabase(localUri: string, videoId: string): Promise<string> {
+  console.log('[DB] Uploading video to Supabase Storage...', localUri);
+
+  try {
+    const uriLower = localUri.toLowerCase();
+    const ext = uriLower.includes('.mov') ? 'mov' : 'mp4';
+    const contentType = ext === 'mov' ? 'video/quicktime' : 'video/mp4';
+    const fileName = `${videoId}_${Date.now()}.${ext}`;
+    const filePath = `videos/${fileName}`;
+
+    const response = await fetch(localUri);
+    if (!response.ok) {
+      throw new Error(`Failed to read local video: ${response.statusText}`);
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    if (arrayBuffer.byteLength === 0) {
+      throw new Error('Video file is empty');
+    }
+
+    const { data, error } = await supabase.storage
+      .from('videos')
+      .upload(filePath, arrayBuffer, {
+        contentType,
+        upsert: true,
+        duplex: 'half',
+      });
+
+    if (error) {
+      console.error('[DB] Video upload error:', error.message, JSON.stringify(error));
+      throw new Error(error.message);
+    }
+    console.log('[DB] Video uploaded successfully:', data?.path);
+
+    const { data: publicUrlData } = supabase.storage
+      .from('videos')
+      .getPublicUrl(filePath);
+
+    if (!publicUrlData.publicUrl) {
+      throw new Error('Failed to generate public URL for video');
+    }
+
+    return publicUrlData.publicUrl;
+  } catch (err: any) {
+    console.error('[DB] uploadVideo exception:', err?.message);
+    throw err;
+  }
+}
+
 export async function uploadAvatarToSupabase(localUri: string, userId: string): Promise<string> {
   console.log('[DB] Uploading avatar...', localUri);
 
@@ -582,6 +711,54 @@ export async function createJokeInDB(joke: {
 
   await adjustUserCounter(joke.userId, 'jokes_count', 1);
   console.log('[DB] Joke created:', joke.id);
+}
+
+export async function createVideoInDB(video: {
+  id: string;
+  userId: string;
+  title: string;
+  videoUri: string;
+  thumbnailUri?: string;
+  duration: number;
+  category: string;
+  tags: string[];
+  language: string;
+  level: string;
+  allowComments: boolean;
+}, user?: User): Promise<void> {
+  if (user) {
+    await ensureUserRecordExists(user);
+  }
+
+  const { error } = await supabase.from('videos').insert({
+    id: video.id,
+    user_id: video.userId,
+    title: video.title,
+    video_uri: video.videoUri,
+    thumbnail_uri: video.thumbnailUri || null,
+    duration: video.duration,
+    category: video.category,
+    tags: video.tags,
+    language: video.language,
+    level: video.level,
+    allow_comments: video.allowComments,
+    reactions: { '😂': 0, '🤣': 0, '😭': 0, '💀': 0, '👏': 0, '❤️': 0 },
+    comments_count: 0,
+    is_trending: false,
+    average_rating: 0,
+    total_ratings: 0,
+  });
+
+  if (error) {
+    console.error('[DB] Error creating video:', error.message);
+    if (error.message.includes('does not exist') || error.code === '42P01') {
+      console.warn('[DB] videos table missing — run supabase-videos.sql');
+    }
+    throw new Error(error.message);
+  }
+
+  await adjustUserCounter(video.userId, 'jokes_count', 1);
+  console.log('[DB] Video created:', video.id);
 }
 
 export async function toggleReactionInDB(jokeId: string, userId: string, emoji: ReactionEmoji): Promise<{ added: boolean }> {
@@ -721,6 +898,40 @@ export async function deleteJokeFromDB(jokeId: string, audioUri: string): Promis
   }
 }
 
+export async function deleteVideoFromDB(videoId: string, videoUri: string): Promise<void> {
+  console.log('[DB] Deleting video:', videoId);
+  try {
+    const { data: videoRow } = await supabase.from('videos').select('user_id').eq('id', videoId).single();
+
+    if (videoUri && videoUri.includes('/storage/v1/object/public/videos/')) {
+      const storagePath = videoUri.split('/storage/v1/object/public/videos/')[1];
+      if (storagePath) {
+        console.log('[DB] Deleting video file from storage:', storagePath);
+        const { error: storageError } = await supabase.storage
+          .from('videos')
+          .remove([storagePath]);
+        if (storageError) {
+          console.warn('[DB] Failed to delete video file:', storageError.message);
+        }
+      }
+    }
+
+    const { error } = await supabase.from('videos').delete().eq('id', videoId);
+    if (error) {
+      console.error('[DB] Error deleting video:', error.message);
+      throw new Error(error.message);
+    }
+
+    if (videoRow?.user_id) {
+      await adjustUserCounter(videoRow.user_id, 'jokes_count', -1);
+    }
+    console.log('[DB] Video deleted:', videoId);
+  } catch (err: any) {
+    console.error('[DB] deleteVideo exception:', err?.message);
+    throw err;
+  }
+}
+
 export async function deleteUserDataFromDB(userId: string): Promise<void> {
   console.log('[DB] Deleting user data for:', userId);
   try { await supabase.from('reactions').delete().eq('user_id', userId); } catch (e) { console.warn('[DB] delete reactions:', e); }
@@ -728,6 +939,7 @@ export async function deleteUserDataFromDB(userId: string): Promise<void> {
   try { await supabase.from('comments').delete().eq('user_id', userId); } catch (e) { console.warn('[DB] delete comments:', e); }
   try { await supabase.from('follows').delete().or(`follower_id.eq.${userId},following_id.eq.${userId}`); } catch (e) { console.warn('[DB] delete follows:', e); }
   try { await supabase.from('jokes').delete().eq('user_id', userId); } catch (e) { console.warn('[DB] delete jokes:', e); }
+  try { await supabase.from('videos').delete().eq('user_id', userId); } catch (e) { console.warn('[DB] delete videos:', e); }
   try { await supabase.from('users').delete().eq('id', userId); } catch (e) { console.warn('[DB] delete user:', e); }
   console.log('[DB] User data deleted');
 }

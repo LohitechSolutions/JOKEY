@@ -11,6 +11,9 @@ const translations: Record<Language, Record<string, string>> = {
     // Tabs
     'tab.home': 'Accueil',
     'tab.categories': 'Catégories',
+    'tab.videos': 'Vidéos',
+    'tab.record': 'Enregistrer',
+    'tab.search': 'Recherche',
     'tab.ranking': 'Top 100',
     'tab.profile': 'Profil',
 
@@ -24,6 +27,12 @@ const translations: Record<Language, Record<string, string>> = {
     'home.empty.title': 'Rien ici pour le moment',
     'home.empty.subscriptions': 'Suivez des créateurs pour voir leurs blagues ici',
     'home.empty.default': 'Les blagues arrivent bientôt !',
+
+    // Videos
+    'videos.title': 'Vidéos Jokey',
+    'videos.subtitle': 'Regardez les meilleures blagues en vidéo',
+    'videos.empty.title': 'Aucune vidéo pour le moment',
+    'videos.empty.default': 'Les vidéos publiées par les créateurs apparaîtront ici.',
 
     // Feed tabs
     'feed.day': 'Du jour',
@@ -58,6 +67,7 @@ const translations: Record<Language, Record<string, string>> = {
     // Profile
     'profile.loading': 'Chargement...',
     'profile.jokes': 'Blagues',
+    'profile.videos': 'Vidéos',
     'profile.likes': 'Likes',
     'profile.followers': 'Abonnés',
     'profile.following': 'Abonnements',
@@ -75,6 +85,11 @@ const translations: Record<Language, Record<string, string>> = {
     'profile.noJokesSub': 'Enregistrez votre première blague !',
     'profile.deleteJoke': 'Supprimer cette blague',
     'profile.deleteJokeConfirm': 'Êtes-vous sûr de vouloir supprimer cette blague ? Cette action est irréversible.',
+    'profile.myVideos': 'Mes vidéos',
+    'profile.noVideos': "Vous n'avez pas encore publié de vidéo",
+    'profile.noVideosSub': 'Enregistrez votre première vidéo !',
+    'profile.deleteVideo': 'Supprimer cette vidéo',
+    'profile.deleteVideoConfirm': 'Êtes-vous sûr de vouloir supprimer cette vidéo ? Cette action est irréversible.',
 
     // Settings
     'settings.title': 'Paramètres',
@@ -129,26 +144,47 @@ const translations: Record<Language, Record<string, string>> = {
 
     // Record
     'record.tapToStop': 'Appuyez pour arrêter',
+    'record.tapToStopVideo': 'Appuyez pour arrêter la vidéo',
     'record.recordingDone': 'Enregistrement terminé !',
+    'record.videoDone': 'Vidéo enregistrée !',
     'record.tapToRecord': 'Appuyez pour enregistrer',
+    'record.tapToRecordVideo': 'Appuyez pour filmer',
+    'record.audioMode': 'Audio',
+    'record.videoMode': 'Vidéo',
     'record.publishTitle': 'Publier votre blague',
+    'record.publishVideoTitle': 'Publier votre vidéo',
     'record.titleOptional': 'Titre (optionnel)',
     'record.titlePlaceholder': 'Donnez un titre à votre blague...',
+    'record.videoTitlePlaceholder': 'Donnez un titre à votre vidéo...',
     'record.category': 'Catégorie *',
     'record.selectCategory': 'Sélectionner une catégorie',
     'record.level': 'Niveau',
     'record.allPublic': '✨ Tout public',
     'record.adult': '🔞 Adulte',
     'record.publish': 'Publier',
+    'record.publishVideo': 'Publier la vidéo',
+    'record.publishing': 'Publication...',
     'record.categoryRequired': 'Catégorie requise',
     'record.categoryRequiredMsg': 'Veuillez sélectionner une catégorie',
     'record.tooShort': 'Trop court',
     'record.tooShortMsg': "L'enregistrement doit durer au moins 3 secondes",
+    'record.videoTooShortMsg': 'La vidéo doit durer au moins 3 secondes',
     'record.published': 'Publié ! 🎉',
     'record.publishedMsg': 'Votre blague a été publiée avec succès',
+    'record.videoPublished': 'Vidéo publiée ! 🎉',
+    'record.videoPublishedMsg': 'Votre vidéo a été publiée avec succès',
     'record.error': 'Erreur',
     'record.errorMsg': "Impossible de démarrer l'enregistrement",
+    'record.playbackError': 'Erreur de lecture',
+    'record.videoErrorMsg': "Impossible de démarrer l'enregistrement vidéo",
+    'record.videoPublishError': 'Impossible de publier la vidéo. Veuillez réessayer.',
+    'record.cameraPermissionRequired': 'La permission caméra est requise pour filmer.',
+    'record.microphonePermissionRequired': 'La permission micro est requise pour enregistrer le son.',
+    'record.cameraUnavailable': "La caméra n'est pas encore prête.",
+    'record.videoEmpty': 'Le fichier vidéo est vide. Veuillez réessayer.',
+    'record.noVideoRecorded': 'Aucune vidéo enregistrée.',
     'record.untitled': 'Sans titre',
+    'record.videoUntitled': 'Vidéo sans titre',
 
     // Joke detail
     'joke.title': 'Blague',
@@ -171,6 +207,10 @@ const translations: Record<Language, Record<string, string>> = {
     'joke.copiedMsg': 'Le lien a été copié dans le presse-papier.',
     'joke.loading': 'Chargement...',
 
+    // Video
+    'video.shareMsg': '🎬 Regarde cette vidéo sur Jokey !',
+    'video.downloadJokey': 'Télécharge Jokey pour regarder des blagues en vidéo !',
+
     // JokeCard
     'jokeCard.share': 'Partager',
     'jokeCard.rate': 'Noter :',
@@ -181,6 +221,9 @@ const translations: Record<Language, Record<string, string>> = {
     'jokeCard.buffering': 'Chargement...',
     'jokeCard.playing': 'En lecture',
     'jokeCard.reactions': 'réactions',
+
+    // VideoCard
+    'videoCard.playing': 'En lecture',
 
     // User profile
     'user.notFound': 'Utilisateur introuvable',
@@ -396,6 +439,9 @@ const translations: Record<Language, Record<string, string>> = {
   EN: {
     'tab.home': 'Home',
     'tab.categories': 'Categories',
+    'tab.videos': 'Videos',
+    'tab.record': 'Record',
+    'tab.search': 'Search',
     'tab.ranking': 'Top 100',
     'tab.profile': 'Profile',
 
@@ -408,6 +454,11 @@ const translations: Record<Language, Record<string, string>> = {
     'home.empty.title': 'Nothing here yet',
     'home.empty.subscriptions': 'Follow creators to see their jokes here',
     'home.empty.default': 'Jokes coming soon!',
+
+    'videos.title': 'Jokey Videos',
+    'videos.subtitle': 'Watch the best jokes on video',
+    'videos.empty.title': 'No videos yet',
+    'videos.empty.default': 'Videos published by creators will appear here.',
 
     'feed.day': 'Today',
     'feed.new': 'New',
@@ -439,6 +490,7 @@ const translations: Record<Language, Record<string, string>> = {
 
     'profile.loading': 'Loading...',
     'profile.jokes': 'Jokes',
+    'profile.videos': 'Videos',
     'profile.likes': 'Likes',
     'profile.followers': 'Followers',
     'profile.following': 'Following',
@@ -456,6 +508,11 @@ const translations: Record<Language, Record<string, string>> = {
     'profile.noJokesSub': 'Record your first joke!',
     'profile.deleteJoke': 'Delete this joke',
     'profile.deleteJokeConfirm': 'Are you sure you want to delete this joke? This action is irreversible.',
+    'profile.myVideos': 'My videos',
+    'profile.noVideos': "You haven't posted any videos yet",
+    'profile.noVideosSub': 'Record your first video!',
+    'profile.deleteVideo': 'Delete this video',
+    'profile.deleteVideoConfirm': 'Are you sure you want to delete this video? This action is irreversible.',
 
     'settings.title': 'Settings',
     'settings.subscription': 'Subscription',
@@ -505,26 +562,47 @@ const translations: Record<Language, Record<string, string>> = {
     'ranking.yourRating': 'Your rating:',
 
     'record.tapToStop': 'Tap to stop',
+    'record.tapToStopVideo': 'Tap to stop video',
     'record.recordingDone': 'Recording done!',
+    'record.videoDone': 'Video recorded!',
     'record.tapToRecord': 'Tap to record',
+    'record.tapToRecordVideo': 'Tap to film',
+    'record.audioMode': 'Audio',
+    'record.videoMode': 'Video',
     'record.publishTitle': 'Publish your joke',
+    'record.publishVideoTitle': 'Publish your video',
     'record.titleOptional': 'Title (optional)',
     'record.titlePlaceholder': 'Give your joke a title...',
+    'record.videoTitlePlaceholder': 'Give your video a title...',
     'record.category': 'Category *',
     'record.selectCategory': 'Select a category',
     'record.level': 'Level',
     'record.allPublic': '✨ All audiences',
     'record.adult': '🔞 Adult',
     'record.publish': 'Publish',
+    'record.publishVideo': 'Publish video',
+    'record.publishing': 'Publishing...',
     'record.categoryRequired': 'Category required',
     'record.categoryRequiredMsg': 'Please select a category',
     'record.tooShort': 'Too short',
     'record.tooShortMsg': 'Recording must be at least 3 seconds',
+    'record.videoTooShortMsg': 'Video must be at least 3 seconds',
     'record.published': 'Published! 🎉',
     'record.publishedMsg': 'Your joke has been published successfully',
+    'record.videoPublished': 'Video published! 🎉',
+    'record.videoPublishedMsg': 'Your video has been published successfully',
     'record.error': 'Error',
     'record.errorMsg': 'Unable to start recording',
+    'record.playbackError': 'Playback error',
+    'record.videoErrorMsg': 'Unable to start video recording',
+    'record.videoPublishError': 'Unable to publish video. Please try again.',
+    'record.cameraPermissionRequired': 'Camera permission is required to film.',
+    'record.microphonePermissionRequired': 'Microphone permission is required to record sound.',
+    'record.cameraUnavailable': 'The camera is not ready yet.',
+    'record.videoEmpty': 'The video file is empty. Please try again.',
+    'record.noVideoRecorded': 'No video recorded.',
     'record.untitled': 'Untitled',
+    'record.videoUntitled': 'Untitled video',
 
     'joke.title': 'Joke',
     'joke.notFound': 'Joke not found',
@@ -546,6 +624,9 @@ const translations: Record<Language, Record<string, string>> = {
     'joke.copiedMsg': 'Link has been copied to clipboard.',
     'joke.loading': 'Loading...',
 
+    'video.shareMsg': '🎬 Watch this video on Jokey!',
+    'video.downloadJokey': 'Download Jokey to watch video jokes!',
+
     'jokeCard.share': 'Share',
     'jokeCard.rate': 'Rate:',
     'jokeCard.jokeOfDay': '🏆 Joke of the day',
@@ -555,6 +636,8 @@ const translations: Record<Language, Record<string, string>> = {
     'jokeCard.buffering': 'Buffering...',
     'jokeCard.playing': 'Playing',
     'jokeCard.reactions': 'reactions',
+
+    'videoCard.playing': 'Playing',
 
     'user.notFound': 'User not found',
     'user.profile': 'Profile',
@@ -766,6 +849,9 @@ const translations: Record<Language, Record<string, string>> = {
   AR: {
     'tab.home': 'الرئيسية',
     'tab.categories': 'الفئات',
+    'tab.videos': 'فيديوهات',
+    'tab.record': 'تسجيل',
+    'tab.search': 'بحث',
     'tab.ranking': 'أفضل 100',
     'tab.profile': 'الملف الشخصي',
 
@@ -778,6 +864,11 @@ const translations: Record<Language, Record<string, string>> = {
     'home.empty.title': 'لا شيء هنا حالياً',
     'home.empty.subscriptions': 'تابع صنّاع المحتوى لرؤية نكتهم هنا',
     'home.empty.default': 'النكت قادمة قريباً!',
+
+    'videos.title': 'فيديوهات Jokey',
+    'videos.subtitle': 'شاهد أفضل النكت بالفيديو',
+    'videos.empty.title': 'لا توجد فيديوهات بعد',
+    'videos.empty.default': 'ستظهر هنا الفيديوهات التي ينشرها صناع المحتوى.',
 
     'feed.day': 'اليوم',
     'feed.new': 'جديد',
@@ -809,6 +900,7 @@ const translations: Record<Language, Record<string, string>> = {
 
     'profile.loading': 'جاري التحميل...',
     'profile.jokes': 'نكت',
+    'profile.videos': 'فيديوهات',
     'profile.likes': 'إعجاب',
     'profile.followers': 'متابعون',
     'profile.following': 'متابَعون',
@@ -826,6 +918,11 @@ const translations: Record<Language, Record<string, string>> = {
     'profile.noJokesSub': 'سجّل أول نكتة لك!',
     'profile.deleteJoke': 'حذف هذه النكتة',
     'profile.deleteJokeConfirm': 'هل أنت متأكد أنك تريد حذف هذه النكتة؟ لا يمكن التراجع عن هذا.',
+    'profile.myVideos': 'فيديوهاتي',
+    'profile.noVideos': 'لم تنشر أي فيديو بعد',
+    'profile.noVideosSub': 'سجّل أول فيديو لك!',
+    'profile.deleteVideo': 'حذف هذا الفيديو',
+    'profile.deleteVideoConfirm': 'هل أنت متأكد أنك تريد حذف هذا الفيديو؟ لا يمكن التراجع عن هذا.',
 
     'settings.title': 'الإعدادات',
     'settings.subscription': 'الاشتراك',
@@ -875,26 +972,47 @@ const translations: Record<Language, Record<string, string>> = {
     'ranking.yourRating': 'تقييمك:',
 
     'record.tapToStop': 'اضغط للإيقاف',
+    'record.tapToStopVideo': 'اضغط لإيقاف الفيديو',
     'record.recordingDone': 'انتهى التسجيل!',
+    'record.videoDone': 'تم تسجيل الفيديو!',
     'record.tapToRecord': 'اضغط للتسجيل',
+    'record.tapToRecordVideo': 'اضغط للتصوير',
+    'record.audioMode': 'صوت',
+    'record.videoMode': 'فيديو',
     'record.publishTitle': 'انشر نكتتك',
+    'record.publishVideoTitle': 'انشر الفيديو',
     'record.titleOptional': 'العنوان (اختياري)',
     'record.titlePlaceholder': 'أعطِ نكتتك عنواناً...',
+    'record.videoTitlePlaceholder': 'أعطِ الفيديو عنواناً...',
     'record.category': 'الفئة *',
     'record.selectCategory': 'اختر فئة',
     'record.level': 'المستوى',
     'record.allPublic': '✨ لجميع الأعمار',
     'record.adult': '🔞 للبالغين',
     'record.publish': 'نشر',
+    'record.publishVideo': 'نشر الفيديو',
+    'record.publishing': 'جاري النشر...',
     'record.categoryRequired': 'الفئة مطلوبة',
     'record.categoryRequiredMsg': 'يرجى اختيار فئة',
     'record.tooShort': 'قصير جداً',
     'record.tooShortMsg': 'يجب أن يكون التسجيل 3 ثوانٍ على الأقل',
+    'record.videoTooShortMsg': 'يجب أن يكون الفيديو 3 ثوانٍ على الأقل',
     'record.published': 'تم النشر! 🎉',
     'record.publishedMsg': 'تم نشر نكتتك بنجاح',
+    'record.videoPublished': 'تم نشر الفيديو! 🎉',
+    'record.videoPublishedMsg': 'تم نشر الفيديو بنجاح',
     'record.error': 'خطأ',
     'record.errorMsg': 'تعذر بدء التسجيل',
+    'record.playbackError': 'خطأ في التشغيل',
+    'record.videoErrorMsg': 'تعذر بدء تسجيل الفيديو',
+    'record.videoPublishError': 'تعذر نشر الفيديو. يرجى المحاولة مرة أخرى.',
+    'record.cameraPermissionRequired': 'إذن الكاميرا مطلوب للتصوير.',
+    'record.microphonePermissionRequired': 'إذن الميكروفون مطلوب لتسجيل الصوت.',
+    'record.cameraUnavailable': 'الكاميرا غير جاهزة بعد.',
+    'record.videoEmpty': 'ملف الفيديو فارغ. يرجى المحاولة مرة أخرى.',
+    'record.noVideoRecorded': 'لم يتم تسجيل أي فيديو.',
     'record.untitled': 'بدون عنوان',
+    'record.videoUntitled': 'فيديو بدون عنوان',
 
     'joke.title': 'نكتة',
     'joke.notFound': 'النكتة غير موجودة',
@@ -916,6 +1034,9 @@ const translations: Record<Language, Record<string, string>> = {
     'joke.copiedMsg': 'تم نسخ الرابط إلى الحافظة.',
     'joke.loading': 'جاري التحميل...',
 
+    'video.shareMsg': '🎬 شاهد هذا الفيديو على Jokey!',
+    'video.downloadJokey': 'حمّل Jokey لمشاهدة نكت الفيديو!',
+
     'jokeCard.share': 'مشاركة',
     'jokeCard.rate': 'قيّم:',
     'jokeCard.jokeOfDay': '🏆 نكتة اليوم',
@@ -925,6 +1046,8 @@ const translations: Record<Language, Record<string, string>> = {
     'jokeCard.buffering': 'جاري التحميل...',
     'jokeCard.playing': 'قيد التشغيل',
     'jokeCard.reactions': 'تفاعلات',
+
+    'videoCard.playing': 'قيد التشغيل',
 
     'user.notFound': 'المستخدم غير موجود',
     'user.profile': 'الملف الشخصي',

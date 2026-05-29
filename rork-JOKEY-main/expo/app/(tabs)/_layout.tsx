@@ -1,11 +1,13 @@
 import { Tabs } from 'expo-router';
-import { Home, Mic, Search, Trophy, Grid3X3, User } from 'lucide-react-native';
+import { Home, Mic, Search, Trophy, Grid3X3, User, Video } from 'lucide-react-native';
 import React from 'react';
 import Colors from '@/constants/colors';
 import { useApp } from '@/contexts/AppContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function TabLayout() {
   const { currentUser } = useApp();
+  const { t } = useLanguage();
   const isCreator = currentUser?.role === 'creator';
 
   return (
@@ -28,21 +30,28 @@ export default function TabLayout() {
       <Tabs.Screen
         name="(home)"
         options={{
-          title: 'Accueil',
+          title: t('tab.home'),
           tabBarIcon: ({ color, size }) => <Home size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="categories"
         options={{
-          title: 'Catégories',
+          title: t('tab.categories'),
           tabBarIcon: ({ color, size }) => <Grid3X3 size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="videos"
+        options={{
+          title: t('tab.videos'),
+          tabBarIcon: ({ color, size }) => <Video size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="record"
         options={{
-          title: 'Enregistrer',
+          title: t('tab.record'),
           tabBarIcon: ({ color, size }) => <Mic size={size} color={color} />,
           href: isCreator ? '/record' : null,
         }}
@@ -50,21 +59,21 @@ export default function TabLayout() {
       <Tabs.Screen
         name="search"
         options={{
-          title: 'Recherche',
+          title: t('tab.search'),
           tabBarIcon: ({ color, size }) => <Search size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="ranking"
         options={{
-          title: 'Top 100',
+          title: t('tab.ranking'),
           tabBarIcon: ({ color, size }) => <Trophy size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profil',
+          title: t('tab.profile'),
           tabBarIcon: ({ color, size }) => <User size={size} color={color} />,
         }}
       />

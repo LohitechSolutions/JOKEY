@@ -10,12 +10,13 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
-import { Settings, Award, Mic, Heart, Users, ChevronRight, LogOut, Trash2, Camera, LogIn, KeyRound } from 'lucide-react-native';
+import { Settings, Award, Mic, Heart, Users, ChevronRight, LogOut, Trash2, Camera, LogIn, KeyRound, Video as VideoIcon } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import Colors from '@/constants/colors';
 import { useApp } from '@/contexts/AppContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import JokeCard from '@/components/JokeCard';
+import VideoCard from '@/components/VideoCard';
 import { useRouter } from 'expo-router';
 
 export default function ProfileScreen() {
@@ -23,9 +24,11 @@ export default function ProfileScreen() {
   const {
     currentUser,
     jokes,
+    videos,
     logout,
     deleteAccount,
     deleteJoke,
+    deleteVideo,
     authChecked,
     isLoading,
     updateProfile,
@@ -37,8 +40,29 @@ export default function ProfileScreen() {
     return jokes.filter(j => j.userId === currentUser?.id);
   }, [jokes, currentUser]);
 
+  const myVideos = useMemo(() => {
+    return videos.filter(v => v.userId === currentUser?.id);
+  }, [videos, currentUser]);
+
   const displayedJokesCount = Math.max(myJokes.length, currentUser?.jokesCount ?? 0);
   const displayedFollowersCount = currentUser?.followersCount ?? 0;
+
+  const handleDeleteVideo = useCallback((videoId: string, videoUri: string) => {
+    Alert.alert(
+      t('profile.deleteVideo'),
+      t('profile.deleteVideoConfirm'),
+      [
+        { text: t('profile.cancel'), style: 'cancel' },
+        {
+          text: t('profile.delete'),
+          style: 'destructive',
+          onPress: () => {
+            deleteVideo(videoId, videoUri);
+          },
+        },
+      ]
+    );
+  }, [deleteVideo, t]);
 
   const handleDeleteJoke = useCallback((jokeId: string, audioUri: string) => {
     Alert.alert(
@@ -205,6 +229,12 @@ export default function ProfileScreen() {
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
+            <VideoIcon size={16} color={Colors.primary} />
+            <Text style={styles.statValue}>{myVideos.length}</Text>
+            <Text style={styles.statLabel}>{t('profile.videos')}</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
             <Heart size={16} color={Colors.primary} />
             <Text style={styles.statValue}>{currentUser.totalLikes}</Text>
             <Text style={styles.statLabel}>{t('profile.likes')}</Text>
@@ -215,7 +245,6 @@ export default function ProfileScreen() {
             <Text style={styles.statValue}>{displayedFollowersCount}</Text>
             <Text style={styles.statLabel}>{t('profile.followers')}</Text>
           </View>
-
         </View>
 
         {currentUser.badges.length > 0 && (
@@ -279,6 +308,30 @@ export default function ProfileScreen() {
               >
                 <Trash2 size={14} color={Colors.error} />
                 <Text style={styles.deleteJokeText}>{t('profile.deleteJoke')}</Text>
+              </TouchableOpacity>
+            </View>
+          ))
+        )}
+      </View>
+
+      <View style={styles.jokesSection}>
+        <Text style={styles.jokesSectionTitle}>{t('profile.myVideos')}</Text>
+        {myVideos.length === 0 ? (
+          <View style={styles.emptyJokes}>
+            <Text style={styles.emptyEmoji}>🎬</Text>
+            <Text style={styles.emptyText}>{t('profile.noVideos')}</Text>
+            <Text style={styles.emptySubtext}>{t('profile.noVideosSub')}</Text>
+          </View>
+        ) : (
+          myVideos.map(video => (
+            <View key={video.id}>
+              <VideoCard video={video} compact />
+              <TouchableOpacity
+                style={styles.deleteJokeBtn}
+                onPress={() => handleDeleteVideo(video.id, video.videoUri)}
+              >
+                <Trash2 size={14} color={Colors.error} />
+                <Text style={styles.deleteJokeText}>{t('profile.deleteVideo')}</Text>
               </TouchableOpacity>
             </View>
           ))
@@ -435,12 +488,12 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   statValue: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '800' as const,
     color: Colors.primary,
   },
   statLabel: {
-    fontSize: 11,
+    fontSize: 10,
     color: Colors.textMuted,
     fontWeight: '500' as const,
   },
