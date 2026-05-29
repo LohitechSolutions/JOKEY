@@ -53,6 +53,36 @@ const DEFAULT_SETTINGS: AppSettings = {
   autoplay: true,
 };
 
+type PublishedContentKind = 'joke' | 'video';
+
+function normalizeLanguage(language?: string): 'FR' | 'EN' | 'AR' {
+  if (language === 'EN' || language === 'AR') {
+    return language;
+  }
+  return 'FR';
+}
+
+function getPublishedNotificationCopy(kind: PublishedContentKind, language?: string): { title: string; message: string } {
+  const locale = normalizeLanguage(language);
+
+  const copy: Record<'FR' | 'EN' | 'AR', Record<PublishedContentKind, { title: string; message: string }>> = {
+    FR: {
+      joke: { title: 'Nouvelle blague audio', message: 'Une nouvelle blague audio vient d’être publiée.' },
+      video: { title: 'Nouvelle vidéo', message: 'Une nouvelle vidéo vient d’être publiée.' },
+    },
+    EN: {
+      joke: { title: 'New audio joke', message: 'A new audio joke was just published.' },
+      video: { title: 'New video', message: 'A new video was just published.' },
+    },
+    AR: {
+      joke: { title: 'نكتة صوتية جديدة', message: 'تم نشر نكتة صوتية جديدة الآن.' },
+      video: { title: 'فيديو جديد', message: 'تم نشر فيديو جديد الآن.' },
+    },
+  };
+
+  return copy[locale][kind];
+}
+
 export const [AppProvider, useApp] = createContextHook(() => {
   const queryClient = useQueryClient();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -854,10 +884,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
 
   const addVideo = useCallback((video: Video) => {
     setVideos(prev => [video, ...prev]);
-    if (currentUser && video.userId === currentUser.id) {
-      setCurrentUser(prev => prev ? { ...prev, jokesCount: prev.jokesCount + 1 } : prev);
-    }
-  }, [currentUser]);
+  }, []);
 
   const updateJokeCommentsCount = useCallback((jokeId: string, count: number) => {
     setJokes(prev => prev.map(j => (j.id === jokeId ? { ...j, commentsCount: count } : j)));
@@ -896,13 +923,8 @@ export const [AppProvider, useApp] = createContextHook(() => {
       }
       return { videoId, ownerId };
     },
-    onSuccess: ({ videoId, ownerId }) => {
+    onSuccess: ({ videoId }) => {
       setVideos(prev => prev.filter(v => v.id !== videoId));
-      if (ownerId && currentUser?.id === ownerId) {
-        setCurrentUser(prev => prev
-          ? { ...prev, jokesCount: Math.max(0, prev.jokesCount - 1) }
-          : prev);
-      }
       console.log('[AppContext] Video deleted:', videoId);
     },
     onError: (error: Error) => {
@@ -1079,6 +1101,55 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const refreshVideos = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ['videos-list'] });
   }, [queryClient]);
+
+  useEffect(() => {
+    if (!dbReady) return;
+
+    const jokesChannel = supabase
+      .channel('jokes-live')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'jokes' },
+        (payload) => {
+          const row = payload.new as { user_id?: string; title?: string };
+          if (row.user_id !== currentUser?.id) {
+            const copy = getPublishedNotificationCopy('joke', currentUser?.language);
+            pushNotification({
+              title: copy.title,
+              message: row.title ? `«${row.title}» — ${copy.message}` : copy.message,
+              kind: 'success',
+            });
+          }
+          refreshJokes();
+        }
+      )
+      .subscribe();
+
+    const videosChannel = supabase
+      .channel('videos-live')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'videos' },
+        (payload) => {
+          const row = payload.new as { user_id?: string; title?: string };
+          if (row.user_id !== currentUser?.id) {
+            const copy = getPublishedNotificationCopy('video', currentUser?.language);
+            pushNotification({
+              title: copy.title,
+              message: row.title ? `«${row.title}» — ${copy.message}` : copy.message,
+              kind: 'success',
+            });
+          }
+          refreshVideos();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(jokesChannel);
+      void supabase.removeChannel(videosChannel);
+    };
+  }, [dbReady, currentUser?.id, currentUser?.language, pushNotification, refreshJokes, refreshVideos]);
 
   // ─── Global audio play / pause ────────────────────────────────────────────
 

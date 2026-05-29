@@ -757,7 +757,6 @@ export async function createVideoInDB(video: {
     throw new Error(error.message);
   }
 
-  await adjustUserCounter(video.userId, 'jokes_count', 1);
   console.log('[DB] Video created:', video.id);
 }
 
@@ -922,9 +921,6 @@ export async function deleteVideoFromDB(videoId: string, videoUri: string): Prom
       throw new Error(error.message);
     }
 
-    if (videoRow?.user_id) {
-      await adjustUserCounter(videoRow.user_id, 'jokes_count', -1);
-    }
     console.log('[DB] Video deleted:', videoId);
   } catch (err: any) {
     console.error('[DB] deleteVideo exception:', err?.message);
