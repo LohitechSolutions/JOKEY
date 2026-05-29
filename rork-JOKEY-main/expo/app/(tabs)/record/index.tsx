@@ -51,7 +51,7 @@ const SAFE_RECORDING_PRESET = {
 } as any;
 
 export default function RecordScreen() {
-  const { addJoke, addVideo, currentUser, incrementCreateCount } = useApp();
+  const { addJoke, addVideo, currentUser, incrementCreateCount, settings, pushNotification } = useApp();
   const { t } = useLanguage();
   const [recordingMode, setRecordingMode] = useState<'audio' | 'video'>('audio');
   const [hasRecording, setHasRecording] = useState(false);
@@ -83,6 +83,19 @@ export default function RecordScreen() {
   const videoPreviewPlayer = useVideoPlayer(videoPreviewSource, (player) => {
     player.loop = true;
   });
+
+  const notifyPublishedContent = useCallback((title: string, message: string) => {
+    if (settings.notifications) {
+      pushNotification({
+        title,
+        message,
+        kind: 'success',
+      });
+      return;
+    }
+
+    Alert.alert(title, message);
+  }, [pushNotification, settings.notifications]);
 
   // Monitor preview player errors
   useEffect(() => {
@@ -433,7 +446,7 @@ export default function RecordScreen() {
         console.warn('[Record] Failed to save to Supabase (local only):', err);
       });
 
-      Alert.alert(t('record.published'), t('record.publishedMsg'));
+      notifyPublishedContent(t('record.published'), t('record.publishedMsg'));
       resetRecording();
     } catch (err) {
       console.error('[Record] Publish error:', err);
@@ -441,7 +454,7 @@ export default function RecordScreen() {
     } finally {
       setIsUploading(false);
     }
-  }, [selectedCategory, recordingDuration, title, language, level, currentUser, addJoke, resetRecording, t, recordedUri, incrementCreateCount]);
+  }, [selectedCategory, recordingDuration, title, language, level, currentUser, addJoke, resetRecording, t, recordedUri, incrementCreateCount, notifyPublishedContent]);
 
   const publishVideo = useCallback(async () => {
     if (!selectedCategory) {
@@ -515,7 +528,7 @@ export default function RecordScreen() {
         console.warn('[Record] Failed to save video to Supabase (local only):', err);
       });
 
-      Alert.alert(t('record.videoPublished'), t('record.videoPublishedMsg'));
+      notifyPublishedContent(t('record.videoPublished'), t('record.videoPublishedMsg'));
       resetVideoRecording();
     } catch (err) {
       console.error('[Record] Publish video error:', err);
@@ -523,7 +536,7 @@ export default function RecordScreen() {
     } finally {
       setIsUploading(false);
     }
-  }, [selectedCategory, videoDuration, currentUser, recordedVideoUri, title, language, level, t, addVideo, incrementCreateCount, resetVideoRecording]);
+  }, [selectedCategory, videoDuration, currentUser, recordedVideoUri, title, language, level, t, addVideo, incrementCreateCount, resetVideoRecording, notifyPublishedContent]);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);

@@ -38,6 +38,15 @@ interface AppSettings {
   autoplay: boolean;
 }
 
+type AppNotificationKind = 'success' | 'error' | 'info' | 'warning';
+
+interface AppNotification {
+  id: string;
+  title: string;
+  message: string;
+  kind: AppNotificationKind;
+}
+
 const DEFAULT_SETTINGS: AppSettings = {
   notifications: true,
   safeMode: false,
@@ -60,6 +69,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const [subscriptionPlan, setSubscriptionPlan] = useState<SubscriptionPlan | null>(null);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const [notification, setNotification] = useState<AppNotification | null>(null);
   const [listenCount, setListenCount] = useState<number>(0);
   const [createCount, setCreateCount] = useState<number>(0);
   const [tipsBalance, setTipsBalance] = useState<Record<string, number>>({});
@@ -70,6 +80,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const globalAudioStatus = useAudioPlayerStatus(globalPlayer);
   const pendingPlay = useRef(false);
   const seenUnloaded = useRef(false);
+  const notificationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -1017,6 +1028,50 @@ export const [AppProvider, useApp] = createContextHook(() => {
     updateSettingsMutation.mutate(newSettings);
   }, [updateSettingsMutation]);
 
+  const clearNotificationTimer = useCallback(() => {
+    if (notificationTimer.current) {
+      clearTimeout(notificationTimer.current);
+      notificationTimer.current = null;
+    }
+  }, []);
+
+  const dismissNotification = useCallback(() => {
+    clearNotificationTimer();
+    setNotification(null);
+  }, [clearNotificationTimer]);
+
+  const pushNotification = useCallback((input: {
+    title: string;
+    message: string;
+    kind?: AppNotificationKind;
+    durationMs?: number;
+  }) => {
+    if (!settings.notifications) {
+      return;
+    }
+
+    clearNotificationTimer();
+
+    const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    setNotification({
+      id,
+      title: input.title,
+      message: input.message,
+      kind: input.kind ?? 'info',
+    });
+
+    notificationTimer.current = setTimeout(() => {
+      setNotification(current => (current?.id === id ? null : current));
+      notificationTimer.current = null;
+    }, input.durationMs ?? 3500);
+  }, [clearNotificationTimer, settings.notifications]);
+
+  useEffect(() => {
+    return () => {
+      clearNotificationTimer();
+    };
+  }, [clearNotificationTimer]);
+
   const refreshJokes = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ['jokes-list'] });
   }, [queryClient]);
@@ -1177,6 +1232,9 @@ export const [AppProvider, useApp] = createContextHook(() => {
     toggleAdmin,
     settings,
     updateSettings,
+    notification,
+    pushNotification,
+    dismissNotification,
     backendAvailable: dbReady,
     directDBAvailable: dbReady,
     refreshJokes,
@@ -1202,7 +1260,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     listenCount, createCount, incrementListenCount, incrementCreateCount,
     canListen, canCreate, sendTip, getTipsForUser, tipsBalance,
     isAdmin, toggleAdmin,
-    settings, updateSettings, dbReady,
+    settings, updateSettings, notification, pushNotification, dismissNotification, dbReady,
     refreshJokes, refreshVideos, totalUsers, authQuery.isLoading, authMutation.isPending, authMutation.variables,
     logoutMutation.isPending, deleteMutation.isPending,
     requestPasswordReset, confirmPasswordReset,
