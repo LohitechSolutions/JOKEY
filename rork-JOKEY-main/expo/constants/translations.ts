@@ -67,6 +67,7 @@ const translations: Record<Language, Record<string, string>> = {
     // Profile
     'profile.loading': 'Chargement...',
     'profile.jokes': 'Blagues',
+    'profile.videos': 'Vidéos',
     'profile.likes': 'Likes',
     'profile.followers': 'Abonnés',
     'profile.following': 'Abonnements',
@@ -84,6 +85,11 @@ const translations: Record<Language, Record<string, string>> = {
     'profile.noJokesSub': 'Enregistrez votre première blague !',
     'profile.deleteJoke': 'Supprimer cette blague',
     'profile.deleteJokeConfirm': 'Êtes-vous sûr de vouloir supprimer cette blague ? Cette action est irréversible.',
+    'profile.myVideos': 'Mes vidéos',
+    'profile.noVideos': "Vous n'avez pas encore publié de vidéo",
+    'profile.noVideosSub': 'Enregistrez votre première vidéo !',
+    'profile.deleteVideo': 'Supprimer cette vidéo',
+    'profile.deleteVideoConfirm': 'Êtes-vous sûr de vouloir supprimer cette vidéo ? Cette action est irréversible.',
 
     // Settings
     'settings.title': 'Paramètres',
@@ -484,6 +490,7 @@ const translations: Record<Language, Record<string, string>> = {
 
     'profile.loading': 'Loading...',
     'profile.jokes': 'Jokes',
+    'profile.videos': 'Videos',
     'profile.likes': 'Likes',
     'profile.followers': 'Followers',
     'profile.following': 'Following',
@@ -501,6 +508,11 @@ const translations: Record<Language, Record<string, string>> = {
     'profile.noJokesSub': 'Record your first joke!',
     'profile.deleteJoke': 'Delete this joke',
     'profile.deleteJokeConfirm': 'Are you sure you want to delete this joke? This action is irreversible.',
+    'profile.myVideos': 'My videos',
+    'profile.noVideos': "You haven't posted any videos yet",
+    'profile.noVideosSub': 'Record your first video!',
+    'profile.deleteVideo': 'Delete this video',
+    'profile.deleteVideoConfirm': 'Are you sure you want to delete this video? This action is irreversible.',
 
     'settings.title': 'Settings',
     'settings.subscription': 'Subscription',
@@ -888,6 +900,7 @@ const translations: Record<Language, Record<string, string>> = {
 
     'profile.loading': 'جاري التحميل...',
     'profile.jokes': 'نكت',
+    'profile.videos': 'فيديوهات',
     'profile.likes': 'إعجاب',
     'profile.followers': 'متابعون',
     'profile.following': 'متابَعون',
@@ -905,6 +918,11 @@ const translations: Record<Language, Record<string, string>> = {
     'profile.noJokesSub': 'سجّل أول نكتة لك!',
     'profile.deleteJoke': 'حذف هذه النكتة',
     'profile.deleteJokeConfirm': 'هل أنت متأكد أنك تريد حذف هذه النكتة؟ لا يمكن التراجع عن هذا.',
+    'profile.myVideos': 'فيديوهاتي',
+    'profile.noVideos': 'لم تنشر أي فيديو بعد',
+    'profile.noVideosSub': 'سجّل أول فيديو لك!',
+    'profile.deleteVideo': 'حذف هذا الفيديو',
+    'profile.deleteVideoConfirm': 'هل أنت متأكد أنك تريد حذف هذا الفيديو؟ لا يمكن التراجع عن هذا.',
 
     'settings.title': 'الإعدادات',
     'settings.subscription': 'الاشتراك',
