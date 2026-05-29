@@ -18,7 +18,6 @@ import { VideoView, useVideoPlayer } from 'expo-video';
 import {
   useAudioRecorder,
   useAudioRecorderState,
-  RecordingPresets,
   AudioModule,
   setAudioModeAsync,
   useAudioPlayer,

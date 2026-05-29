@@ -44,6 +44,8 @@ export default function ProfileScreen() {
     return videos.filter(v => v.userId === currentUser?.id);
   }, [videos, currentUser]);
 
+  const [selectedMediaSection, setSelectedMediaSection] = useState<'videos' | 'audios'>('videos');
+
   const displayedJokesCount = Math.max(myJokes.length, currentUser?.jokesCount ?? 0);
   const displayedFollowersCount = currentUser?.followersCount ?? 0;
 
@@ -290,51 +292,81 @@ export default function ProfileScreen() {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.jokesSection}>
-        <Text style={styles.jokesSectionTitle}>{t('profile.myJokes')}</Text>
-        {myJokes.length === 0 ? (
-          <View style={styles.emptyJokes}>
-            <Text style={styles.emptyEmoji}>🎤</Text>
-            <Text style={styles.emptyText}>{t('profile.noJokes')}</Text>
-            <Text style={styles.emptySubtext}>{t('profile.noJokesSub')}</Text>
+      <View style={styles.mediaSection}>
+        <View style={styles.mediaHeader}>
+          <View>
+            <Text style={styles.jokesSectionTitle}>{t('profile.myVideos')}</Text>
+            <Text style={styles.mediaSubtitle}>
+              {selectedMediaSection === 'videos'
+                ? `${myVideos.length} vidéo${myVideos.length > 1 ? 's' : ''}`
+                : `${myJokes.length} audio${myJokes.length > 1 ? 's' : ''}`}
+            </Text>
           </View>
-        ) : (
-          myJokes.map(joke => (
-            <View key={joke.id}>
-              <JokeCard joke={joke} compact />
-              <TouchableOpacity
-                style={styles.deleteJokeBtn}
-                onPress={() => handleDeleteJoke(joke.id, joke.audioUri)}
-              >
-                <Trash2 size={14} color={Colors.error} />
-                <Text style={styles.deleteJokeText}>{t('profile.deleteJoke')}</Text>
-              </TouchableOpacity>
-            </View>
-          ))
-        )}
-      </View>
 
-      <View style={styles.jokesSection}>
-        <Text style={styles.jokesSectionTitle}>{t('profile.myVideos')}</Text>
-        {myVideos.length === 0 ? (
-          <View style={styles.emptyJokes}>
-            <Text style={styles.emptyEmoji}>🎬</Text>
-            <Text style={styles.emptyText}>{t('profile.noVideos')}</Text>
-            <Text style={styles.emptySubtext}>{t('profile.noVideosSub')}</Text>
+          <View style={styles.mediaTabs}>
+            <TouchableOpacity
+              style={[styles.mediaTab, selectedMediaSection === 'videos' && styles.mediaTabActive]}
+              onPress={() => setSelectedMediaSection('videos')}
+            >
+              <VideoIcon size={14} color={selectedMediaSection === 'videos' ? Colors.primary : Colors.textSecondary} />
+              <Text style={[styles.mediaTabText, selectedMediaSection === 'videos' && styles.mediaTabTextActive]}>
+                Vidéos
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.mediaTab, selectedMediaSection === 'audios' && styles.mediaTabActive]}
+              onPress={() => setSelectedMediaSection('audios')}
+            >
+              <Mic size={14} color={selectedMediaSection === 'audios' ? Colors.primary : Colors.textSecondary} />
+              <Text style={[styles.mediaTabText, selectedMediaSection === 'audios' && styles.mediaTabTextActive]}>
+                Audios
+              </Text>
+            </TouchableOpacity>
           </View>
-        ) : (
-          myVideos.map(video => (
-            <View key={video.id}>
-              <VideoCard video={video} compact />
-              <TouchableOpacity
-                style={styles.deleteJokeBtn}
-                onPress={() => handleDeleteVideo(video.id, video.videoUri)}
-              >
-                <Trash2 size={14} color={Colors.error} />
-                <Text style={styles.deleteJokeText}>{t('profile.deleteVideo')}</Text>
-              </TouchableOpacity>
+        </View>
+
+        {selectedMediaSection === 'videos' ? (
+          myVideos.length === 0 ? (
+            <View style={styles.emptyJokes}>
+              <Text style={styles.emptyEmoji}>🎬</Text>
+              <Text style={styles.emptyText}>{t('profile.noVideos')}</Text>
+              <Text style={styles.emptySubtext}>{t('profile.noVideosSub')}</Text>
             </View>
-          ))
+          ) : (
+            myVideos.map(video => (
+              <View key={video.id}>
+                <VideoCard video={video} compact />
+                <TouchableOpacity
+                  style={styles.deleteMediaBtn}
+                  onPress={() => handleDeleteVideo(video.id, video.videoUri)}
+                >
+                  <Trash2 size={14} color={Colors.error} />
+                  <Text style={styles.deleteJokeText}>{t('profile.deleteVideo')}</Text>
+                </TouchableOpacity>
+              </View>
+            ))
+          )
+        ) : (
+          myJokes.length === 0 ? (
+            <View style={styles.emptyJokes}>
+              <Text style={styles.emptyEmoji}>🎤</Text>
+              <Text style={styles.emptyText}>{t('profile.noJokes')}</Text>
+              <Text style={styles.emptySubtext}>{t('profile.noJokesSub')}</Text>
+            </View>
+          ) : (
+            myJokes.map(joke => (
+              <View key={joke.id}>
+                <JokeCard joke={joke} compact />
+                <TouchableOpacity
+                  style={styles.deleteMediaBtn}
+                  onPress={() => handleDeleteJoke(joke.id, joke.audioUri)}
+                >
+                  <Trash2 size={14} color={Colors.error} />
+                  <Text style={styles.deleteJokeText}>{t('profile.deleteJoke')}</Text>
+                </TouchableOpacity>
+              </View>
+            ))
+          )
         )}
       </View>
     </ScrollView>
@@ -626,9 +658,45 @@ const styles = StyleSheet.create({
     fontWeight: '700' as const,
     color: Colors.error,
   },
-  jokesSection: {
+  mediaSection: {
     paddingHorizontal: 16,
     marginTop: 24,
+  },
+  mediaHeader: {
+    marginBottom: 14,
+  },
+  mediaSubtitle: {
+    fontSize: 13,
+    color: Colors.textMuted,
+    marginTop: 4,
+  },
+  mediaTabs: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 12,
+  },
+  mediaTab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 14,
+    backgroundColor: Colors.card,
+    borderWidth: 1.5,
+    borderColor: Colors.cardBorder,
+  },
+  mediaTabActive: {
+    backgroundColor: Colors.primary + '14',
+    borderColor: Colors.primary + '60',
+  },
+  mediaTabText: {
+    fontSize: 13,
+    fontWeight: '600' as const,
+    color: Colors.textSecondary,
+  },
+  mediaTabTextActive: {
+    color: Colors.primary,
   },
   jokesSectionTitle: {
     fontSize: 18,
@@ -666,6 +734,19 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     marginTop: -4,
     marginBottom: 10,
+  },
+  deleteMediaBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    marginTop: -2,
+    marginBottom: 12,
+    backgroundColor: Colors.card,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: Colors.error + '30',
   },
   deleteJokeText: {
     fontSize: 13,
