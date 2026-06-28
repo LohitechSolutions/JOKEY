@@ -46,10 +46,14 @@ workflows:
           xcode-project use-profiles --warn-only
       - name: Increment build number
         script: |
-          cd "$CM_BUILD_DIR/ios"
+          cd ios
           if [ "$APP_ID" != "0" ]; then
-            LATEST_BUILD_NUMBER=$(app-store-connect get-latest-testflight-build-number "$APP_ID")
-            UPDATED_BUILD_NUMBER=$(($LATEST_BUILD_NUMBER + 1))
+            LATEST_BUILD_NUMBER=$(app-store-connect get-latest-testflight-build-number "$APP_ID" 2>/dev/null || true)
+            if [ -n "$LATEST_BUILD_NUMBER" ] && [ "$LATEST_BUILD_NUMBER" -ge 1 ] 2>/dev/null; then
+              UPDATED_BUILD_NUMBER=$(($LATEST_BUILD_NUMBER + 1))
+            else
+              UPDATED_BUILD_NUMBER=$PROJECT_BUILD_NUMBER
+            fi
           else
             UPDATED_BUILD_NUMBER=$PROJECT_BUILD_NUMBER
           fi
@@ -57,7 +61,7 @@ workflows:
       - name: Build ipa for distribution
         script: |
           xcode-project build-ipa \
-            --workspace "$CM_BUILD_DIR/ios/$XCODE_WORKSPACE" \
+            --workspace "ios/$XCODE_WORKSPACE" \
             --scheme "$XCODE_SCHEME"
     artifacts:
       - build/ios/ipa/*.ipa
