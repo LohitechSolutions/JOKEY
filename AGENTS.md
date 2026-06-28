@@ -6,6 +6,7 @@
 - The app lives in `rork-JOKEY-main/expo/`. Run all commands from that directory.
 - **Jokey** ("Blagues Audio") is a French audio‑jokes Expo / React Native app (Expo 54, React Native 0.81, expo-router, TanStack Query, Supabase). It runs on iOS, Android and web; in this cloud VM we test the **web** target.
 - The package manager is **Bun** (see `bun.lock`). Standard scripts are in `rork-JOKEY-main/expo/package.json`.
+- If you use **npm** instead of Bun, `npm install` fails with an `ERESOLVE` peer-dependency conflict (`lucide-react-native@0.475.0` / `@ai-sdk/react` declare React peer ranges that predate React 19). `rork-JOKEY-main/expo/.npmrc` sets `legacy-peer-deps=true` so plain `npm install` works; otherwise run `npm install --legacy-peer-deps`. Bun resolves this fine and needs no flag.
 
 ### Running the web dev server (important caveat)
 - The `package.json` scripts (`start`, `start-web`) all pass `--tunnel`, which uses ngrok and does **not** work in this VM. Start the web server **without** `--tunnel` instead:
