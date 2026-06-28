@@ -1,5 +1,67 @@
 workflows:
-  sample-workflow:
-    name: Codemagic Sample Workflow
+  jokey-ios-testflight:
+    name: Jokey iOS TestFlight
     max_build_duration: 120
     instance_type: mac_mini_m2
+    working_directory: rork-JOKEY-main/expo
+    # Use the App Store Connect API integration for the account that owns Jokey.
+    # Codemagic > Team settings > Integrations > Developer Portal > copy the name.
+    integrations:
+      app_store_connect: LohitechSolutions
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: app.rork.azbb4413e811lknfmyslw
+      vars:
+        XCODE_WORKSPACE: Jokey.xcworkspace
+        XCODE_SCHEME: Jokey
+        # App Store Connect > Apps > Jokey > App Information > Apple ID
+        APP_ID: 0
+      node: v22.13.1
+      xcode: latest
+      cocoapods: default
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+    scripts:
+      - name: Install Bun and dependencies
+        script: |
+          curl -fsSL https://bun.sh/install | bash
+          export BUN_INSTALL="$HOME/.bun"
+          export PATH="$BUN_INSTALL/bin:$PATH"
+          bun install --frozen-lockfile
+      - name: Generate iOS project
+        script: |
+          NODE_ENV=production bunx expo prebuild --platform ios --no-install
+      - name: Install CocoaPods dependencies
+        script: |
+          cd ios && pod install
+      - name: Set up code signing settings on Xcode project
+        script: |
+          xcode-project use-profiles --warn-only
+      - name: Increment build number
+        script: |
+          cd "$CM_BUILD_DIR/ios"
+          if [ "$APP_ID" != "0" ]; then
+            LATEST_BUILD_NUMBER=$(app-store-connect get-latest-testflight-build-number "$APP_ID")
+            UPDATED_BUILD_NUMBER=$(($LATEST_BUILD_NUMBER + 1))
+          else
+            UPDATED_BUILD_NUMBER=$PROJECT_BUILD_NUMBER
+          fi
+          agvtool new-version -all "$UPDATED_BUILD_NUMBER"
+      - name: Build ipa for distribution
+        script: |
+          xcode-project build-ipa \
+            --workspace "$CM_BUILD_DIR/ios/$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
