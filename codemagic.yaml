@@ -35,6 +35,8 @@ workflows:
           bun install --frozen-lockfile
       - name: Generate iOS project
         script: |
+          export BUN_INSTALL="$HOME/.bun"
+          export PATH="$BUN_INSTALL/bin:$PATH"
           NODE_ENV=production bunx expo prebuild --platform ios --no-install
       - name: Install CocoaPods dependencies
         script: |
