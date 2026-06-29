@@ -2,7 +2,7 @@
   "expo": {
     "name": "Jokey",
     "slug": "azbb4413e811lknfmyslw",
-    "version": "1.12",
+    "version": "1.14",
     "orientation": "portrait",
     "icon": "./assets/images/icon.jpeg",
     "scheme": "rork-app",
@@ -22,11 +22,12 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": false,
+      "supportsTablet": true,
+      "buildNumber": "14",
       "bundleIdentifier": "app.rork.azbb4413e811lknfmyslw"
     },
     "android": {
-      "versionCode": 12,
+      "versionCode": 14,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.jpeg",
         "backgroundColor": "#ffffff"
