@@ -14,7 +14,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 
-import { Stack } from 'expo-router';
+import { Stack, useRouter, Link } from 'expo-router';
 import { Mail, Lock, User, Eye, EyeOff, ArrowLeft, Mic, Headphones } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
@@ -34,6 +34,8 @@ export default function AuthScreen() {
   const [password, setPassword] = useState('');
   const [selectedRole, setSelectedRole] = useState<'creator' | 'visitor' | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [confirmedAge, setConfirmedAge] = useState(false);
 
   const [resetEmail, setResetEmail] = useState('');
   const [_resetSent, setResetSent] = useState(false);
@@ -101,6 +103,14 @@ export default function AuthScreen() {
       }
       if (!selectedRole) {
         Alert.alert(t('auth.selectRole'), t('auth.selectRoleMsg'));
+        return;
+      }
+      if (!confirmedAge) {
+        Alert.alert(t('auth.fieldsRequired'), t('auth.mustBe13'));
+        return;
+      }
+      if (!acceptedTerms) {
+        Alert.alert(t('auth.fieldsRequired'), t('auth.mustAcceptTerms'));
         return;
       }
       register({ username: username.trim(), email: email.trim(), password, role: selectedRole });
@@ -461,6 +471,35 @@ export default function AuthScreen() {
                 </TouchableOpacity>
               )}
 
+              {mode === 'register' && (
+                <View style={styles.legalSection}>
+                  <TouchableOpacity
+                    style={styles.checkboxRow}
+                    onPress={() => setConfirmedAge(!confirmedAge)}
+                  >
+                    <View style={[styles.checkbox, confirmedAge && styles.checkboxChecked]}>
+                      {confirmedAge && <Text style={styles.checkmark}>✓</Text>}
+                    </View>
+                    <Text style={styles.checkboxLabel}>{t('auth.ageConfirm')}</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.checkboxRow}
+                    onPress={() => setAcceptedTerms(!acceptedTerms)}
+                  >
+                    <View style={[styles.checkbox, acceptedTerms && styles.checkboxChecked]}>
+                      {acceptedTerms && <Text style={styles.checkmark}>✓</Text>}
+                    </View>
+                    <Text style={styles.checkboxLabel}>
+                      {t('auth.acceptTerms')}{' '}
+                      <Link href="/terms" style={styles.legalLink}>{t('auth.termsLink')}</Link>
+                      {' '}{t('auth.and')}{' '}
+                      <Link href="/privacy" style={styles.legalLink}>{t('auth.privacyLink')}</Link>
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
               <TouchableOpacity
                 style={[styles.submitBtn, isSubmitting && styles.submitBtnDisabled]}
                 onPress={handleSubmit}
@@ -741,5 +780,45 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 2,
     borderColor: Colors.primary + '30',
+  },
+  legalSection: {
+    marginTop: 4,
+    marginBottom: 8,
+    gap: 10,
+  },
+  checkboxRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'flex-start' as const,
+    gap: 10,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 5,
+    borderWidth: 2,
+    borderColor: Colors.cardBorder,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    marginTop: 2,
+  },
+  checkboxChecked: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  checkmark: {
+    color: Colors.white,
+    fontSize: 12,
+    fontWeight: '700' as const,
+  },
+  checkboxLabel: {
+    flex: 1,
+    fontSize: 13,
+    color: Colors.textSecondary,
+    lineHeight: 18,
+  },
+  legalLink: {
+    color: Colors.primary,
+    fontWeight: '700' as const,
+    textDecorationLine: 'underline' as const,
   },
 });

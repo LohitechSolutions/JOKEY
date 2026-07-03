@@ -6,33 +6,60 @@ import {
   ScrollView,
   Image,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
-import { ArrowLeft, UserPlus, UserMinus, Mic, Heart, Users, Award, Flag } from 'lucide-react-native';
+import { ArrowLeft, UserPlus, UserMinus, Mic, Heart, Users, Award, Flag, Ban } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useApp } from '@/contexts/AppContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import JokeCard from '@/components/JokeCard';
+import { showReportDialog, showReportSuccess, showBlockConfirm } from '@/lib/moderation-client';
 
 export default function UserProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { jokes, isFollowing, toggleFollow } = useApp();
+  const { visibleJokes, jokes, currentUser, isFollowing, toggleFollow, isUserBlocked, blockUser, unblockUser, reportContent } = useApp();
   const { t } = useLanguage();
 
   const user = useMemo(() => {
     const joke = jokes.find(j => j.userId === id);
     return joke?.user ?? null;
   }, [jokes, id]);
-  const userJokes = useMemo(() => jokes.filter(j => j.userId === id), [jokes, id]);
+  const userJokes = useMemo(() => visibleJokes.filter(j => j.userId === id), [visibleJokes, id]);
   const following = user ? isFollowing(user.id) : false;
+  const blocked = user ? isUserBlocked(user.id) : false;
+  const isOwnProfile = currentUser?.id === id;
 
   const handleToggleFollow = useCallback(() => {
     if (!user) return;
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     toggleFollow({ userId: user.id });
   }, [user, toggleFollow]);
+
+  const handleReport = useCallback(() => {
+    if (!user) return;
+    showReportDialog(t, async (reason) => {
+      await reportContent({ targetType: 'user', targetId: user.id, reason });
+      showReportSuccess(t);
+    });
+  }, [user, t, reportContent]);
+
+  const handleBlock = useCallback(() => {
+    if (!user) return;
+    if (blocked) {
+      void unblockUser(user.id);
+      Alert.alert(t('moderation.unblockSuccessTitle'), t('moderation.unblockSuccessMsg'));
+      return;
+    }
+    showBlockConfirm(t, user.username, async () => {
+      await blockUser(user.id);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert(t('moderation.blockSuccessTitle'), t('moderation.blockSuccessMsg'));
+      router.back();
+    });
+  }, [user, blocked, t, blockUser, unblockUser, router]);
 
   if (!user) {
     return (
@@ -66,26 +93,39 @@ export default function UserProfileScreen() {
         {user.bio ? <Text style={styles.bio}>{user.bio}</Text> : null}
 
         <View style={styles.actionsRow}>
-          <TouchableOpacity
-            style={[styles.followBtn, following && styles.followBtnActive]}
-            onPress={handleToggleFollow}
-          >
-            {following ? (
-              <>
-                <UserMinus size={16} color={Colors.primary} />
-                <Text style={styles.followBtnTextActive}>{t('user.following')}</Text>
-              </>
-            ) : (
-              <>
-                <UserPlus size={16} color={Colors.white} />
-                <Text style={styles.followBtnText}>{t('user.follow')}</Text>
-              </>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.reportBtn}>
-            <Flag size={16} color={Colors.textMuted} />
-          </TouchableOpacity>
+          {!isOwnProfile && (
+            <>
+              <TouchableOpacity
+                style={[styles.followBtn, following && styles.followBtnActive]}
+                onPress={handleToggleFollow}
+              >
+                {following ? (
+                  <>
+                    <UserMinus size={16} color={Colors.primary} />
+                    <Text style={styles.followBtnTextActive}>{t('user.following')}</Text>
+                  </>
+                ) : (
+                  <>
+                    <UserPlus size={16} color={Colors.white} />
+                    <Text style={styles.followBtnText}>{t('user.follow')}</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.reportBtn} onPress={handleReport}>
+                <Flag size={16} color={Colors.textMuted} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.reportBtn} onPress={handleBlock}>
+                <Ban size={16} color={blocked ? Colors.error : Colors.textMuted} />
+              </TouchableOpacity>
+            </>
+          )}
         </View>
+
+        {blocked && !isOwnProfile && (
+          <View style={styles.blockedBanner}>
+            <Text style={styles.blockedText}>{t('moderation.blockedBanner')}</Text>
+          </View>
+        )}
 
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
@@ -323,5 +363,20 @@ const styles = StyleSheet.create({
   noJokesText: {
     fontSize: 14,
     color: Colors.textSecondary,
+  },
+  blockedBanner: {
+    backgroundColor: Colors.error + '15',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: Colors.error + '30',
+  },
+  blockedText: {
+    fontSize: 13,
+    color: Colors.error,
+    textAlign: 'center',
+    fontWeight: '600' as const,
   },
 });

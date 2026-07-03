@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { ArrowLeft, Trash2, AlertTriangle, Mail } from 'lucide-react-native';
+import { SUPPORT_EMAIL } from '@/constants/app-config';
 import Colors from '@/constants/colors';
 import { useApp } from '@/contexts/AppContext';
 
@@ -166,7 +167,7 @@ export default function DeleteAccountScreen() {
       <View style={styles.contactSection}>
         <Text style={styles.contactTitle}>Besoin d'aide ?</Text>
         <Text style={styles.contactText}>
-          Contactez-nous à support@blagueaudio.com pour toute question concernant la suppression de votre compte.
+          Contactez-nous à {SUPPORT_EMAIL} pour toute question concernant la suppression de votre compte.
         </Text>
       </View>
     </ScrollView>

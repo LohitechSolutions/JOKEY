@@ -2,7 +2,7 @@
   "expo": {
     "name": "Jokey",
     "slug": "azbb4413e811lknfmyslw",
-    "version": "1.12",
+    "version": "1.13",
     "orientation": "portrait",
     "icon": "./assets/images/icon.jpeg",
     "scheme": "rork-app",
@@ -23,10 +23,23 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "app.rork.azbb4413e811lknfmyslw"
+      "bundleIdentifier": "app.rork.azbb4413e811lknfmyslw",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Jokey needs microphone access to record audio jokes and videos.",
+        "NSCameraUsageDescription": "Jokey needs camera access to record video jokes.",
+        "NSPhotoLibraryUsageDescription": "Jokey needs photo library access to set your profile avatar."
+      },
+      "privacyManifests": {
+        "NSPrivacyAccessedAPITypes": [
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+            "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
+          }
+        ]
+      }
     },
     "android": {
-      "versionCode": 12,
+      "versionCode": 13,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.jpeg",
         "backgroundColor": "#ffffff"
@@ -52,6 +65,12 @@
       "expo-font",
       "expo-web-browser",
       "expo-audio",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Jokey needs photo library access to set your profile avatar."
+        }
+      ],
       [
         "expo-camera",
         {

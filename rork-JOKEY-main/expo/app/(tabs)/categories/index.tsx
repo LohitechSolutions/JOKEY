@@ -15,22 +15,22 @@ import { JokeCategory, CategoryInfo } from '@/types';
 import JokeCard from '@/components/JokeCard';
 
 export default function CategoriesScreen() {
-  const { jokes } = useApp();
+  const { visibleJokes } = useApp();
   const { t } = useLanguage();
   const [selectedCategory, setSelectedCategory] = useState<JokeCategory | null>(null);
 
   const categoryJokes = useMemo(() => {
     if (!selectedCategory) return [];
-    return jokes.filter(j => j.category === selectedCategory);
-  }, [selectedCategory, jokes]);
+    return visibleJokes.filter(j => j.category === selectedCategory);
+  }, [selectedCategory, visibleJokes]);
 
   const jokeCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    jokes.forEach(j => {
+    visibleJokes.forEach(j => {
       counts[j.category] = (counts[j.category] || 0) + 1;
     });
     return counts;
-  }, [jokes]);
+  }, [visibleJokes]);
 
   const handleBack = useCallback(() => {
     setSelectedCategory(null);

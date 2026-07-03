@@ -54,7 +54,7 @@ const FEED_TABS: { id: FeedTab; tKey: string; emoji: string }[] = [
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const {
-    jokes,
+    visibleJokes,
     followingIds,
     totalUsers,
     refreshJokes,
@@ -71,23 +71,23 @@ export default function HomeScreen() {
   const filteredJokes = useMemo(() => {
     switch (activeTab) {
       case 'jour':
-        return jokes.filter(j => j.isJokeOfDay || j.isTrending).slice(0, 5);
+        return visibleJokes.filter(j => j.isJokeOfDay || j.isTrending).slice(0, 5);
       case 'nouveautes':
-        return [...jokes].sort((a, b) =>
+        return [...visibleJokes].sort((a, b) =>
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         );
       case 'tendances':
-        return [...jokes].sort((a, b) => {
+        return [...visibleJokes].sort((a, b) => {
           const aTotal = Object.values(a.reactions).reduce((s, c) => s + c, 0);
           const bTotal = Object.values(b.reactions).reduce((s, c) => s + c, 0);
           return bTotal - aTotal;
         });
       case 'abonnements':
-        return jokes.filter(j => followingIds.includes(j.userId));
+        return visibleJokes.filter(j => followingIds.includes(j.userId));
       default:
-        return jokes;
+        return visibleJokes;
     }
-  }, [activeTab, jokes, followingIds]);
+  }, [activeTab, visibleJokes, followingIds]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -103,7 +103,7 @@ export default function HomeScreen() {
   const handleSurprise = useCallback(() => {
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-    const surpriseJoke = getLastRecordedJokeOfDay(jokes);
+    const surpriseJoke = getLastRecordedJokeOfDay(visibleJokes);
     if (!surpriseJoke) {
       Alert.alert(t('home.surprise.emptyTitle'), t('home.surprise.emptyMessage'));
       return;
@@ -113,7 +113,7 @@ export default function HomeScreen() {
     setPendingScrollJokeId(surpriseJoke.id);
     playJoke(surpriseJoke);
     incrementListenCount();
-  }, [jokes, playJoke, incrementListenCount, t]);
+  }, [visibleJokes, playJoke, incrementListenCount, t]);
 
   useEffect(() => {
     if (!pendingScrollJokeId) return;

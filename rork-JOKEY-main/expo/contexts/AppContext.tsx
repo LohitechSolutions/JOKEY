@@ -10,6 +10,14 @@ import { clientRegister, clientLogin, clientDeleteAccount, clientRequestPassword
 import { handleAuthDeepLink } from '@/lib/auth-deep-link';
 import * as Linking from 'expo-linking';
 import { ensureDBReady, fetchJokesFromDB, fetchVideosFromDB, toggleReactionInDB, rateJokeInDB, toggleFollowInDB, deleteJokeFromDB, deleteVideoFromDB, ensureUserRecordExists, uploadAvatarToSupabase, updateUserProfileInDB, refreshUserProfileStats, fetchFollowingIdsFromDB, fetchTotalUserCount } from '@/lib/db-client';
+import { filterJokes, filterVideos } from '@/lib/content-filter';
+import {
+  getBlockedUserIds,
+  blockUser as blockUserInStorage,
+  unblockUser as unblockUserInStorage,
+  submitReport,
+  type ReportPayload,
+} from '@/lib/moderation-client';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 
@@ -28,6 +36,7 @@ const STORAGE_KEYS = {
   LISTEN_COUNT: 'joky_listen_count',
   CREATE_COUNT: 'joky_create_count',
   TIPS_BALANCE: 'joky_tips_balance',
+  PREAMBLE_ACCEPTED: 'joky_preamble_accepted',
 };
 
 
@@ -65,6 +74,8 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const [tipsBalance, setTipsBalance] = useState<Record<string, number>>({});
   const [dbReady, setDbReady] = useState<boolean>(false);
   const [totalUsers, setTotalUsers] = useState<number>(0);
+  const [blockedUserIds, setBlockedUserIds] = useState<string[]>([]);
+  const [preambleAccepted, setPreambleAccepted] = useState<boolean | null>(null);
 
   const globalPlayer = useAudioPlayer(null);
   const globalAudioStatus = useAudioPlayerStatus(globalPlayer);
@@ -430,6 +441,23 @@ export const [AppProvider, useApp] = createContextHook(() => {
     },
   });
 
+  const preambleQuery = useQuery({
+    queryKey: ['preamble-accepted'],
+    queryFn: async () => {
+      const stored = await AsyncStorage.getItem(STORAGE_KEYS.PREAMBLE_ACCEPTED);
+      return stored === 'true';
+    },
+  });
+
+  const blockedUsersQuery = useQuery({
+    queryKey: ['blocked-users', currentUser?.id],
+    queryFn: async () => {
+      if (!currentUser?.id) return [];
+      return getBlockedUserIds(currentUser.id);
+    },
+    enabled: Boolean(currentUser?.id),
+  });
+
   useEffect(() => {
     if (subscriptionQuery.data !== undefined) {
       setIsSubscribed(subscriptionQuery.data.subscribed);
@@ -452,6 +480,24 @@ export const [AppProvider, useApp] = createContextHook(() => {
   useEffect(() => {
     if (settingsQuery.data) setSettings(settingsQuery.data);
   }, [settingsQuery.data]);
+
+  useEffect(() => {
+    if (preambleQuery.data !== undefined) setPreambleAccepted(preambleQuery.data);
+  }, [preambleQuery.data]);
+
+  useEffect(() => {
+    if (blockedUsersQuery.data) setBlockedUserIds(blockedUsersQuery.data);
+  }, [blockedUsersQuery.data]);
+
+  const visibleJokes = useMemo(
+    () => filterJokes(jokes, { safeMode: settings.safeMode, blockedUserIds }),
+    [jokes, settings.safeMode, blockedUserIds]
+  );
+
+  const visibleVideos = useMemo(
+    () => filterVideos(videos, { safeMode: settings.safeMode, blockedUserIds }),
+    [videos, settings.safeMode, blockedUserIds]
+  );
 
   const authMutation = useMutation({
     mutationFn: async (input: { type: 'register'; username: string; email: string; password: string; role?: string } | { type: 'login'; email: string; password: string }) => {
@@ -1017,6 +1063,47 @@ export const [AppProvider, useApp] = createContextHook(() => {
     updateSettingsMutation.mutate(newSettings);
   }, [updateSettingsMutation]);
 
+  const acceptPreamble = useCallback(async () => {
+    await AsyncStorage.setItem(STORAGE_KEYS.PREAMBLE_ACCEPTED, 'true');
+    setPreambleAccepted(true);
+    queryClient.setQueryData(['preamble-accepted'], true);
+  }, [queryClient]);
+
+  const isUserBlocked = useCallback(
+    (userId: string) => blockedUserIds.includes(userId),
+    [blockedUserIds]
+  );
+
+  const blockUser = useCallback(
+    async (userId: string) => {
+      if (!currentUser?.id || userId === currentUser.id) return;
+      await blockUserInStorage(currentUser.id, userId);
+      const updated = await getBlockedUserIds(currentUser.id);
+      setBlockedUserIds(updated);
+      queryClient.setQueryData(['blocked-users', currentUser.id], updated);
+    },
+    [currentUser?.id, queryClient]
+  );
+
+  const unblockUser = useCallback(
+    async (userId: string) => {
+      if (!currentUser?.id) return;
+      await unblockUserInStorage(currentUser.id, userId);
+      const updated = await getBlockedUserIds(currentUser.id);
+      setBlockedUserIds(updated);
+      queryClient.setQueryData(['blocked-users', currentUser.id], updated);
+    },
+    [currentUser?.id, queryClient]
+  );
+
+  const reportContent = useCallback(
+    async (payload: Omit<ReportPayload, 'reporterId'>) => {
+      if (!currentUser?.id) return;
+      await submitReport({ ...payload, reporterId: currentUser.id });
+    },
+    [currentUser?.id]
+  );
+
   const refreshJokes = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ['jokes-list'] });
   }, [queryClient]);
@@ -1135,6 +1222,8 @@ export const [AppProvider, useApp] = createContextHook(() => {
     authError,
     jokes,
     videos,
+    visibleJokes,
+    visibleVideos,
     followingIds,
     playingJokeId,
     setPlayingJokeId,
@@ -1177,6 +1266,13 @@ export const [AppProvider, useApp] = createContextHook(() => {
     toggleAdmin,
     settings,
     updateSettings,
+    preambleAccepted,
+    acceptPreamble,
+    blockedUserIds,
+    blockUser,
+    unblockUser,
+    isUserBlocked,
+    reportContent,
     backendAvailable: dbReady,
     directDBAvailable: dbReady,
     refreshJokes,
@@ -1194,7 +1290,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     isPasswordRecovery,
     setIsPasswordRecovery,
   }), [
-    currentUser, isAuthenticated, authChecked, authError, jokes, videos, followingIds,
+    currentUser, isAuthenticated, authChecked, authError, jokes, videos, visibleJokes, visibleVideos, followingIds,
     playingJokeId, playJoke, pauseAudio, globalAudioStatus,
     login, register, logout, deleteAccount, updateProfile, updateProfileMutation.isPending, toggleFollow,
     addReaction, rateJoke, addJoke, addVideo, updateJokeCommentsCount, deleteJoke, deleteVideo, deleteJokeMutation.isPending, deleteVideoMutation.isPending, isFollowing, getJokeReactions, getMyRating,
@@ -1202,7 +1298,9 @@ export const [AppProvider, useApp] = createContextHook(() => {
     listenCount, createCount, incrementListenCount, incrementCreateCount,
     canListen, canCreate, sendTip, getTipsForUser, tipsBalance,
     isAdmin, toggleAdmin,
-    settings, updateSettings, dbReady,
+    settings, updateSettings, preambleAccepted, acceptPreamble,
+    blockedUserIds, blockUser, unblockUser, isUserBlocked, reportContent,
+    dbReady,
     refreshJokes, refreshVideos, totalUsers, authQuery.isLoading, authMutation.isPending, authMutation.variables,
     logoutMutation.isPending, deleteMutation.isPending,
     requestPasswordReset, confirmPasswordReset,

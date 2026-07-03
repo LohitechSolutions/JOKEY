@@ -10,7 +10,7 @@ import {
   Platform,
   Alert,
 } from 'react-native';
-import { Play, Pause, MessageCircle, Share2, Clock, Star, Volume2 } from 'lucide-react-native';
+import { Play, Pause, MessageCircle, Share2, Clock, Star, Volume2, Flag } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { Joke, ReactionEmoji } from '@/types';
 import { REACTION_EMOJIS, CATEGORIES } from '@/mocks/data';
@@ -18,6 +18,7 @@ import Colors from '@/constants/colors';
 import { useApp } from '@/contexts/AppContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useRouter } from 'expo-router';
+import { showReportDialog, showReportSuccess } from '@/lib/moderation-client';
 
 interface JokeCardProps {
   joke: Joke;
@@ -60,6 +61,8 @@ export default React.memo(function JokeCard({ joke, onPlay, compact }: JokeCardP
     rateJoke,
     getMyRating,
     incrementListenCount,
+    reportContent,
+    currentUser,
   } = useApp();
   const { t } = useLanguage();
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -129,6 +132,18 @@ export default React.memo(function JokeCard({ joke, onPlay, compact }: JokeCardP
     }
   }, [joke, t]);
 
+  const handleReport = useCallback((e?: { stopPropagation?: () => void }) => {
+    e?.stopPropagation?.();
+    if (!currentUser) {
+      Alert.alert(t('joke.loginToComment'), t('joke.loginToCommentMsg'));
+      return;
+    }
+    showReportDialog(t, async (reason) => {
+      await reportContent({ targetType: 'joke', targetId: joke.id, reason });
+      showReportSuccess(t);
+    });
+  }, [joke.id, currentUser, t, reportContent]);
+
   return (
     <TouchableOpacity
       style={[styles.card, compact && styles.cardCompact]}
@@ -156,6 +171,9 @@ export default React.memo(function JokeCard({ joke, onPlay, compact }: JokeCardP
             <Text style={[styles.categoryName, { color: category.color }]}>{category.name}</Text>
           </View>
         )}
+        <TouchableOpacity style={styles.reportBtn} onPress={handleReport} hitSlop={8}>
+          <Flag size={14} color={Colors.textMuted} />
+        </TouchableOpacity>
       </View>
 
       {joke.title ? (
@@ -310,6 +328,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 10,
+  },
+  reportBtn: {
+    padding: 6,
+    marginLeft: 4,
   },
   userInfo: {
     flexDirection: 'row',

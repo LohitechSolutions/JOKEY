@@ -25,6 +25,7 @@ import {
 import Colors from '@/constants/colors';
 import { useApp } from '@/contexts/AppContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { APP_VERSION, PRIVACY_POLICY_URL } from '@/constants/app-config';
 import { LANGUAGE_OPTIONS } from '@/constants/translations';
 
 export default function SettingsScreen() {
@@ -32,6 +33,7 @@ export default function SettingsScreen() {
   const {
     logout, deleteAccount, isLoggingOut, isDeletingAccount,
     settings, updateSettings,
+    blockedUserIds, unblockUser,
   } = useApp();
   // App is fully free - no subscription needed
   const { t, language, changeLanguage } = useLanguage();
@@ -221,6 +223,35 @@ export default function SettingsScreen() {
       </View>
 
       <View style={styles.section}>
+        <Text style={styles.sectionTitle}>{t('moderation.blockedUsers')}</Text>
+        {blockedUserIds.length === 0 ? (
+          <View style={styles.settingRow}>
+            <Text style={styles.settingSubtext}>{t('moderation.noBlockedUsers')}</Text>
+          </View>
+        ) : (
+          blockedUserIds.map((userId) => (
+            <TouchableOpacity
+              key={userId}
+              style={styles.settingRow}
+              onPress={() => {
+                Alert.alert(
+                  t('moderation.unblockSuccessTitle'),
+                  t('moderation.unblockSuccessMsg'),
+                  [
+                    { text: t('common.cancel'), style: 'cancel' },
+                    { text: t('moderation.unblock'), onPress: () => void unblockUser(userId) },
+                  ]
+                );
+              }}
+            >
+              <Text style={styles.settingText}>@{userId.slice(0, 8)}…</Text>
+              <Text style={styles.unblockText}>{t('moderation.unblock')}</Text>
+            </TouchableOpacity>
+          ))
+        )}
+      </View>
+
+      <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t('settings.legal')}</Text>
         <TouchableOpacity
           style={styles.settingRow}
@@ -282,7 +313,8 @@ export default function SettingsScreen() {
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.version}>Jokey v1.0.0</Text>
+      <Text style={styles.version}>Jokey v{APP_VERSION}</Text>
+      <Text style={styles.privacyUrl}>{PRIVACY_POLICY_URL}</Text>
     </ScrollView>
   );
 }
@@ -387,6 +419,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.textMuted,
     marginTop: 20,
+  },
+  privacyUrl: {
+    textAlign: 'center',
+    fontSize: 11,
+    color: Colors.textMuted,
+    marginTop: 4,
+  },
+  unblockText: {
+    fontSize: 13,
+    color: Colors.primary,
+    fontWeight: '600' as const,
   },
   langPicker: {
     marginTop: 6,

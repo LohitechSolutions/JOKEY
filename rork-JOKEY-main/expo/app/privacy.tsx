@@ -5,11 +5,13 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Linking,
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { ArrowLeft, Shield } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { PRIVACY_POLICY_URL } from '@/constants/app-config';
 
 export default function PrivacyScreen() {
   const router = useRouter();
@@ -57,6 +59,16 @@ export default function PrivacyScreen() {
       </View>
 
       <View style={styles.section}>
+        <Text style={styles.sectionTitle}>{t('privacy.thirdPartyTitle')}</Text>
+        <Text style={styles.sectionText}>{t('privacy.thirdPartyText')}</Text>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>{t('privacy.moderationTitle')}</Text>
+        <Text style={styles.sectionText}>{t('privacy.moderationText')}</Text>
+      </View>
+
+      <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t('privacy.rightsTitle')}</Text>
         <Text style={styles.sectionText}>{t('privacy.rightsText')}</Text>
       </View>
@@ -64,6 +76,9 @@ export default function PrivacyScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t('privacy.contactTitle')}</Text>
         <Text style={styles.sectionText}>{t('privacy.contactText')}</Text>
+        <TouchableOpacity onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}>
+          <Text style={styles.webLink}>{PRIVACY_POLICY_URL}</Text>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
@@ -123,5 +138,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.textSecondary,
     lineHeight: 22,
+  },
+  webLink: {
+    fontSize: 13,
+    color: Colors.primary,
+    marginTop: 10,
+    textDecorationLine: 'underline',
   },
 });
