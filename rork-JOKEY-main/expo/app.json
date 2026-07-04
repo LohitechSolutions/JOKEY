@@ -24,6 +24,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "app.rork.azbb4413e811lknfmyslw",
+      "buildNumber": "13",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Jokey needs microphone access to record audio jokes and videos.",
         "NSCameraUsageDescription": "Jokey needs camera access to record video jokes.",

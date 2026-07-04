@@ -39,3 +39,21 @@ CREATE POLICY "Users can manage their own blocks"
   ON blocked_users FOR ALL
   USING (auth.uid() = blocker_id)
   WITH CHECK (auth.uid() = blocker_id);
+
+-- Deletes the authenticated user's auth account (run after public data is deleted)
+CREATE OR REPLACE FUNCTION delete_own_account()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+  DELETE FROM auth.users WHERE id = auth.uid();
+END;
+$$;
+
+REVOKE ALL ON FUNCTION delete_own_account() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION delete_own_account() TO authenticated;

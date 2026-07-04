@@ -18,7 +18,7 @@ import Colors from '@/constants/colors';
 import { useApp } from '@/contexts/AppContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useRouter } from 'expo-router';
-import { showReportDialog, showReportSuccess } from '@/lib/moderation-client';
+import { handleReport as runReportFlow } from '@/lib/moderation-client';
 
 interface JokeCardProps {
   joke: Joke;
@@ -62,7 +62,7 @@ export default React.memo(function JokeCard({ joke, onPlay, compact }: JokeCardP
     getMyRating,
     incrementListenCount,
     reportContent,
-    currentUser,
+    isAuthenticated,
   } = useApp();
   const { t } = useLanguage();
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -134,15 +134,10 @@ export default React.memo(function JokeCard({ joke, onPlay, compact }: JokeCardP
 
   const handleReport = useCallback((e?: { stopPropagation?: () => void }) => {
     e?.stopPropagation?.();
-    if (!currentUser) {
-      Alert.alert(t('joke.loginToComment'), t('joke.loginToCommentMsg'));
-      return;
-    }
-    showReportDialog(t, async (reason) => {
-      await reportContent({ targetType: 'joke', targetId: joke.id, reason });
-      showReportSuccess(t);
-    });
-  }, [joke.id, currentUser, t, reportContent]);
+    void runReportFlow(t, isAuthenticated, (reason) =>
+      reportContent({ targetType: 'joke', targetId: joke.id, reason })
+    );
+  }, [joke.id, isAuthenticated, t, reportContent]);
 
   return (
     <TouchableOpacity

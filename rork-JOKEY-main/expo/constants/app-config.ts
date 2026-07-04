@@ -1,4 +1,8 @@
 export const APP_VERSION = '1.13';
+export const PRESERVED_STORAGE_KEYS = [
+  'joky_preamble_accepted',
+  'joky_settings',
+] as const;
 export const PRIVACY_POLICY_URL = 'https://jokey.app/privacy';
 export const TERMS_URL = 'https://jokey.app/terms';
 export const SUPPORT_EMAIL = 'support@jokey.app';

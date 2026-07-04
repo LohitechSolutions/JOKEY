@@ -23,7 +23,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { CATEGORIES, REACTION_EMOJIS } from '@/mocks/data';
 import { ReactionEmoji, Comment } from '@/types';
 import { addCommentToDB, fetchCommentsFromDB } from '@/lib/db-client';
-import { showReportDialog, showReportSuccess } from '@/lib/moderation-client';
+import { handleReport as runReportFlow } from '@/lib/moderation-client';
 
 function formatDuration(seconds: number): string {
   const mins = Math.floor(seconds / 60);
@@ -49,6 +49,8 @@ export default function JokeDetailScreen() {
   const queryClient = useQueryClient();
   const {
     jokes,
+    visibleJokes,
+    blockedUserIds,
     currentUser,
     isAuthenticated,
     playingJokeId,
@@ -64,7 +66,11 @@ export default function JokeDetailScreen() {
   const [commentText, setCommentText] = useState('');
 
   const { t } = useLanguage();
-  const joke = useMemo(() => jokes.find(j => j.id === id), [jokes, id]);
+  const joke = useMemo(() => visibleJokes.find(j => j.id === id), [visibleJokes, id]);
+  const hiddenJoke = useMemo(
+    () => !joke ? jokes.find(j => j.id === id) ?? null : null,
+    [joke, jokes, id]
+  );
   const myReactions = joke ? getJokeReactions(joke.id) : [];
   const category = joke ? CATEGORIES.find(c => c.id === joke.category) : null;
 
@@ -74,7 +80,10 @@ export default function JokeDetailScreen() {
     enabled: Boolean(id),
   });
 
-  const comments = commentsQuery.data ?? [];
+  const comments = useMemo(
+    () => (commentsQuery.data ?? []).filter((c) => !blockedUserIds.includes(c.userId)),
+    [commentsQuery.data, blockedUserIds]
+  );
   const commentsCount = joke?.commentsCount ?? comments.length;
 
   const addCommentMutation = useMutation({
@@ -158,18 +167,28 @@ export default function JokeDetailScreen() {
 
   const handleReportJoke = useCallback(() => {
     if (!joke) return;
-    showReportDialog(t, async (reason) => {
-      await reportContent({ targetType: 'joke', targetId: joke.id, reason });
-      showReportSuccess(t);
-    });
-  }, [joke, t, reportContent]);
+    void runReportFlow(t, isAuthenticated, (reason) =>
+      reportContent({ targetType: 'joke', targetId: joke.id, reason })
+    );
+  }, [joke, t, isAuthenticated, reportContent]);
 
   const handleReportComment = useCallback((commentId: string) => {
-    showReportDialog(t, async (reason) => {
-      await reportContent({ targetType: 'comment', targetId: commentId, reason });
-      showReportSuccess(t);
-    });
-  }, [t, reportContent]);
+    void runReportFlow(t, isAuthenticated, (reason) =>
+      reportContent({ targetType: 'comment', targetId: commentId, reason })
+    );
+  }, [t, isAuthenticated, reportContent]);
+
+  if (hiddenJoke) {
+    return (
+      <View style={styles.container}>
+        <Stack.Screen options={{ title: t('joke.title') }} />
+        <View style={styles.notFound}>
+          <Text style={styles.notFoundEmoji}>🔒</Text>
+          <Text style={styles.notFoundText}>{t('moderation.contentUnavailable')}</Text>
+        </View>
+      </View>
+    );
+  }
 
   if (!joke) {
     return (

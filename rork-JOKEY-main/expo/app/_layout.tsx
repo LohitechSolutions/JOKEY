@@ -26,15 +26,15 @@ function RootLayoutNav() {
     const inPreambleScreen = segments[0] === 'preamble';
     const inLegalScreen = segments[0] === 'privacy' || segments[0] === 'terms';
 
-    if (!preambleAccepted && !inPreambleScreen && !inLegalScreen) {
-      console.log('[RootLayout] Preamble not accepted — redirecting to preamble');
-      router.replace('/preamble');
-      return;
-    }
-
     if (isPasswordRecovery && !inAuthScreen) {
       console.log('[RootLayout] Password recovery — redirecting to auth');
       router.replace('/auth');
+      return;
+    }
+
+    if (!preambleAccepted && !inPreambleScreen && !inLegalScreen) {
+      console.log('[RootLayout] Preamble not accepted — redirecting to preamble');
+      router.replace('/preamble');
       return;
     }
 

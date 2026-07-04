@@ -27,13 +27,14 @@ import { useApp } from '@/contexts/AppContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { APP_VERSION, PRIVACY_POLICY_URL } from '@/constants/app-config';
 import { LANGUAGE_OPTIONS } from '@/constants/translations';
+import { showUnblockConfirm } from '@/lib/moderation-client';
 
 export default function SettingsScreen() {
   const router = useRouter();
   const {
     logout, deleteAccount, isLoggingOut, isDeletingAccount,
     settings, updateSettings,
-    blockedUserIds, unblockUser,
+    blockedUsers, unblockUser,
   } = useApp();
   // App is fully free - no subscription needed
   const { t, language, changeLanguage } = useLanguage();
@@ -224,27 +225,20 @@ export default function SettingsScreen() {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t('moderation.blockedUsers')}</Text>
-        {blockedUserIds.length === 0 ? (
+        {blockedUsers.length === 0 ? (
           <View style={styles.settingRow}>
             <Text style={styles.settingSubtext}>{t('moderation.noBlockedUsers')}</Text>
           </View>
         ) : (
-          blockedUserIds.map((userId) => (
+          blockedUsers.map((entry) => (
             <TouchableOpacity
-              key={userId}
+              key={entry.id}
               style={styles.settingRow}
               onPress={() => {
-                Alert.alert(
-                  t('moderation.unblockSuccessTitle'),
-                  t('moderation.unblockSuccessMsg'),
-                  [
-                    { text: t('common.cancel'), style: 'cancel' },
-                    { text: t('moderation.unblock'), onPress: () => void unblockUser(userId) },
-                  ]
-                );
+                showUnblockConfirm(t, entry.username, () => void unblockUser(entry.id));
               }}
             >
-              <Text style={styles.settingText}>@{userId.slice(0, 8)}…</Text>
+              <Text style={styles.settingText}>@{entry.username}</Text>
               <Text style={styles.unblockText}>{t('moderation.unblock')}</Text>
             </TouchableOpacity>
           ))

@@ -13,10 +13,13 @@ import { ensureDBReady, fetchJokesFromDB, fetchVideosFromDB, toggleReactionInDB,
 import { filterJokes, filterVideos } from '@/lib/content-filter';
 import {
   getBlockedUserIds,
+  getBlockedUsers,
+  syncBlockedUsersFromDB,
   blockUser as blockUserInStorage,
   unblockUser as unblockUserInStorage,
   submitReport,
   type ReportPayload,
+  type BlockedUserEntry,
 } from '@/lib/moderation-client';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
@@ -75,6 +78,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const [dbReady, setDbReady] = useState<boolean>(false);
   const [totalUsers, setTotalUsers] = useState<number>(0);
   const [blockedUserIds, setBlockedUserIds] = useState<string[]>([]);
+  const [blockedUsers, setBlockedUsers] = useState<BlockedUserEntry[]>([]);
   const [preambleAccepted, setPreambleAccepted] = useState<boolean | null>(null);
 
   const globalPlayer = useAudioPlayer(null);
@@ -389,14 +393,14 @@ export const [AppProvider, useApp] = createContextHook(() => {
   }, [authQuery.isError, authQuery.error]);
 
   useEffect(() => {
-    if (jokesQuery.data && jokesQuery.data.length > 0) {
+    if (jokesQuery.data !== undefined) {
       setJokes(jokesQuery.data);
       console.log('[AppContext] Loaded', jokesQuery.data.length, 'jokes from Supabase');
     }
   }, [jokesQuery.data]);
 
   useEffect(() => {
-    if (videosQuery.data && videosQuery.data.length > 0) {
+    if (videosQuery.data !== undefined) {
       setVideos(videosQuery.data);
       console.log('[AppContext] Loaded', videosQuery.data.length, 'videos from Supabase');
     }
@@ -452,8 +456,8 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const blockedUsersQuery = useQuery({
     queryKey: ['blocked-users', currentUser?.id],
     queryFn: async () => {
-      if (!currentUser?.id) return [];
-      return getBlockedUserIds(currentUser.id);
+      if (!currentUser?.id) return [] as BlockedUserEntry[];
+      return syncBlockedUsersFromDB(currentUser.id);
     },
     enabled: Boolean(currentUser?.id),
   });
@@ -486,7 +490,10 @@ export const [AppProvider, useApp] = createContextHook(() => {
   }, [preambleQuery.data]);
 
   useEffect(() => {
-    if (blockedUsersQuery.data) setBlockedUserIds(blockedUsersQuery.data);
+    if (blockedUsersQuery.data) {
+      setBlockedUsers(blockedUsersQuery.data);
+      setBlockedUserIds(blockedUsersQuery.data.map((e) => e.id));
+    }
   }, [blockedUsersQuery.data]);
 
   const visibleJokes = useMemo(
@@ -669,9 +676,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     },
     onError: (error: Error) => {
       console.error('[AppContext] Delete account error:', error.message);
-      setCurrentUser(null);
-      setIsAuthenticated(false);
-      queryClient.setQueryData(['auth-restore'], null);
+      setAuthError(error.message);
     },
   });
 
@@ -1075,11 +1080,12 @@ export const [AppProvider, useApp] = createContextHook(() => {
   );
 
   const blockUser = useCallback(
-    async (userId: string) => {
+    async (userId: string, username?: string) => {
       if (!currentUser?.id || userId === currentUser.id) return;
-      await blockUserInStorage(currentUser.id, userId);
-      const updated = await getBlockedUserIds(currentUser.id);
-      setBlockedUserIds(updated);
+      await blockUserInStorage(currentUser.id, userId, username);
+      const updated = await getBlockedUsers(currentUser.id);
+      setBlockedUsers(updated);
+      setBlockedUserIds(updated.map((e) => e.id));
       queryClient.setQueryData(['blocked-users', currentUser.id], updated);
     },
     [currentUser?.id, queryClient]
@@ -1089,17 +1095,18 @@ export const [AppProvider, useApp] = createContextHook(() => {
     async (userId: string) => {
       if (!currentUser?.id) return;
       await unblockUserInStorage(currentUser.id, userId);
-      const updated = await getBlockedUserIds(currentUser.id);
-      setBlockedUserIds(updated);
+      const updated = await getBlockedUsers(currentUser.id);
+      setBlockedUsers(updated);
+      setBlockedUserIds(updated.map((e) => e.id));
       queryClient.setQueryData(['blocked-users', currentUser.id], updated);
     },
     [currentUser?.id, queryClient]
   );
 
   const reportContent = useCallback(
-    async (payload: Omit<ReportPayload, 'reporterId'>) => {
-      if (!currentUser?.id) return;
-      await submitReport({ ...payload, reporterId: currentUser.id });
+    async (payload: Omit<ReportPayload, 'reporterId'>): Promise<boolean> => {
+      if (!currentUser?.id) return false;
+      return submitReport({ ...payload, reporterId: currentUser.id });
     },
     [currentUser?.id]
   );
@@ -1269,6 +1276,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     preambleAccepted,
     acceptPreamble,
     blockedUserIds,
+    blockedUsers,
     blockUser,
     unblockUser,
     isUserBlocked,
@@ -1299,7 +1307,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     canListen, canCreate, sendTip, getTipsForUser, tipsBalance,
     isAdmin, toggleAdmin,
     settings, updateSettings, preambleAccepted, acceptPreamble,
-    blockedUserIds, blockUser, unblockUser, isUserBlocked, reportContent,
+    blockedUserIds, blockedUsers, blockUser, unblockUser, isUserBlocked, reportContent,
     dbReady,
     refreshJokes, refreshVideos, totalUsers, authQuery.isLoading, authMutation.isPending, authMutation.variables,
     logoutMutation.isPending, deleteMutation.isPending,

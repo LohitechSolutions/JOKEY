@@ -440,6 +440,11 @@ const translations: Record<Language, Record<string, string>> = {
     'moderation.blockedBanner': 'Vous avez bloqué cet utilisateur',
     'moderation.blockedUsers': 'Utilisateurs bloqués',
     'moderation.noBlockedUsers': 'Aucun utilisateur bloqué',
+    'moderation.loginToReport': 'Connexion requise',
+    'moderation.reportFailed': 'Le signalement n\'a pas pu être envoyé. Réessayez.',
+    'moderation.contentUnavailable': 'Ce contenu n\'est pas disponible (bloqué ou filtré).',
+    'moderation.unblockConfirmTitle': 'Débloquer cet utilisateur ?',
+    'moderation.unblockConfirmMsg': 'Vous verrez à nouveau le contenu de @{username}.',
 
     // Auth legal
     'auth.ageConfirm': 'J\'ai au moins 13 ans',
@@ -905,6 +910,11 @@ const translations: Record<Language, Record<string, string>> = {
     'moderation.blockedBanner': 'You have blocked this user',
     'moderation.blockedUsers': 'Blocked users',
     'moderation.noBlockedUsers': 'No blocked users',
+    'moderation.loginToReport': 'Sign in required',
+    'moderation.reportFailed': 'Could not submit report. Please try again.',
+    'moderation.contentUnavailable': 'This content is unavailable (blocked or filtered).',
+    'moderation.unblockConfirmTitle': 'Unblock this user?',
+    'moderation.unblockConfirmMsg': 'You will see content from @{username} again.',
 
     // Auth legal
     'auth.ageConfirm': 'I am at least 13 years old',
@@ -1331,6 +1341,11 @@ const translations: Record<Language, Record<string, string>> = {
     'moderation.blockedBanner': 'لقد حظرت هذا المستخدم',
     'moderation.blockedUsers': 'المستخدمون المحظورون',
     'moderation.noBlockedUsers': 'لا يوجد مستخدمون محظورون',
+    'moderation.loginToReport': 'يلزم تسجيل الدخول',
+    'moderation.reportFailed': 'تعذر إرسال البلاغ. حاول مرة أخرى.',
+    'moderation.contentUnavailable': 'هذا المحتوى غير متاح (محظور أو مفلتر).',
+    'moderation.unblockConfirmTitle': 'إلغاء حظر هذا المستخدم؟',
+    'moderation.unblockConfirmMsg': 'سترى محتوى @{username} مرة أخرى.',
 
     // Auth legal
     'auth.ageConfirm': 'عمري 13 عاماً على الأقل',

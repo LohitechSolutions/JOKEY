@@ -9,13 +9,15 @@ import {
   Platform,
   Alert,
 } from 'react-native';
-import { Play, Pause, Share2, Clock, Star, Volume2 } from 'lucide-react-native';
+import { Play, Pause, Share2, Clock, Star, Volume2, Flag } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { Video } from '@/types';
 import { CATEGORIES } from '@/mocks/data';
 import Colors from '@/constants/colors';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useApp } from '@/contexts/AppContext';
+import { handleReport as runReportFlow } from '@/lib/moderation-client';
 
 interface VideoCardProps {
   video: Video;
@@ -42,6 +44,7 @@ function timeAgo(dateStr: string, tFn: (key: string, params?: Record<string, str
 
 export default React.memo(function VideoCard({ video, compact }: VideoCardProps) {
   const { t } = useLanguage();
+  const { reportContent, isAuthenticated } = useApp();
   const [isPlaying, setIsPlaying] = useState(false);
   const category = CATEGORIES.find(c => c.id === video.category);
   const source = useMemo(() => ({ uri: video.videoUri }), [video.videoUri]);
@@ -84,6 +87,12 @@ export default React.memo(function VideoCard({ video, compact }: VideoCardProps)
     }
   }, [video, t]);
 
+  const handleReport = useCallback(() => {
+    void runReportFlow(t, isAuthenticated, (reason) =>
+      reportContent({ targetType: 'video', targetId: video.id, reason })
+    );
+  }, [video.id, isAuthenticated, t, reportContent]);
+
   return (
     <View style={[styles.card, compact && styles.cardCompact]} testID={`video-card-${video.id}`}>
       <View style={styles.header}>
@@ -100,6 +109,9 @@ export default React.memo(function VideoCard({ video, compact }: VideoCardProps)
             <Text style={[styles.categoryName, { color: category.color }]}>{category.name}</Text>
           </View>
         )}
+        <TouchableOpacity style={styles.reportBtn} onPress={handleReport} hitSlop={8}>
+          <Flag size={14} color={Colors.textMuted} />
+        </TouchableOpacity>
       </View>
 
       {video.title ? (
@@ -177,6 +189,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 10,
+  },
+  reportBtn: {
+    padding: 6,
+    marginLeft: 4,
   },
   userInfo: {
     flexDirection: 'row',

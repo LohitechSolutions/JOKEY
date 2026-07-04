@@ -5,15 +5,13 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Linking,
 } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useRouter, Link } from 'expo-router';
 import { Shield, Users, AlertTriangle } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useApp } from '@/contexts/AppContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { PRIVACY_POLICY_URL, TERMS_URL } from '@/constants/app-config';
 
 export default function PreambleScreen() {
   const router = useRouter();
@@ -71,13 +69,9 @@ export default function PreambleScreen() {
         </View>
 
         <View style={styles.linksRow}>
-          <TouchableOpacity onPress={() => Linking.openURL(TERMS_URL)}>
-            <Text style={styles.link}>{t('preamble.termsLink')}</Text>
-          </TouchableOpacity>
+          <Link href="/terms" style={styles.link}>{t('preamble.termsLink')}</Link>
           <Text style={styles.linkSep}>·</Text>
-          <TouchableOpacity onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}>
-            <Text style={styles.link}>{t('preamble.privacyLink')}</Text>
-          </TouchableOpacity>
+          <Link href="/privacy" style={styles.link}>{t('preamble.privacyLink')}</Link>
         </View>
 
         <TouchableOpacity
