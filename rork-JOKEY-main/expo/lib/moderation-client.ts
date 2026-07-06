@@ -113,6 +113,15 @@ export async function blockUser(
     );
     if (error) console.warn('[Moderation] Supabase block failed:', error.message);
   }
+
+  // Apple Guideline 1.2: blocking must notify the developer
+  await submitReport({
+    reporterId: currentUserId,
+    targetType: 'user',
+    targetId: blockedUserId,
+    reason: 'harassment',
+    details: `Auto-report triggered by block action for user @${username ?? blockedUserId}`,
+  });
 }
 
 export async function unblockUser(currentUserId: string, blockedUserId: string): Promise<void> {

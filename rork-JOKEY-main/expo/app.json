@@ -2,7 +2,7 @@
   "expo": {
     "name": "Jokey",
     "slug": "azbb4413e811lknfmyslw",
-    "version": "1.13",
+    "version": "1.14",
     "orientation": "portrait",
     "icon": "./assets/images/icon.jpeg",
     "scheme": "rork-app",
@@ -16,6 +16,11 @@
         "exclude": ["expo-location"]
       }
     },
+    "locales": {
+      "en": "./locales/en.json",
+      "fr": "./locales/fr.json",
+      "ar": "./locales/ar.json"
+    },
     "splash": {
       "image": "./assets/images/splash-icon.jpeg",
       "resizeMode": "contain",
@@ -24,11 +29,13 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "app.rork.azbb4413e811lknfmyslw",
-      "buildNumber": "13",
+      "buildNumber": "14",
       "infoPlist": {
-        "NSMicrophoneUsageDescription": "Jokey needs microphone access to record audio jokes and videos.",
-        "NSCameraUsageDescription": "Jokey needs camera access to record video jokes.",
-        "NSPhotoLibraryUsageDescription": "Jokey needs photo library access to set your profile avatar."
+        "CFBundleLocalizations": ["en", "fr", "ar"],
+        "CFBundleDevelopmentRegion": "en",
+        "NSMicrophoneUsageDescription": "Jokey uses your microphone to record audio jokes and video sound. For example, when you tap Record, your voice is captured and published as a joke for the community.",
+        "NSCameraUsageDescription": "Jokey uses your camera to record video jokes. For example, when you record a video joke, the footage is saved and shared on your Jokey profile for other users to watch.",
+        "NSPhotoLibraryUsageDescription": "Jokey accesses your photo library so you can choose a profile picture. For example, the photo you select will be displayed on your public profile for other users to see."
       },
       "privacyManifests": {
         "NSPrivacyAccessedAPITypes": [
@@ -40,7 +47,7 @@
       }
     },
     "android": {
-      "versionCode": 13,
+      "versionCode": 14,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.jpeg",
         "backgroundColor": "#ffffff"
@@ -69,14 +76,14 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Jokey needs photo library access to set your profile avatar."
+          "photosPermission": "Jokey accesses your photo library so you can choose a profile picture. For example, the photo you select will be displayed on your public profile for other users to see."
         }
       ],
       [
         "expo-camera",
         {
-          "cameraPermission": "Jokey utilise la caméra pour enregistrer vos vidéos.",
-          "microphonePermission": "Jokey utilise le micro pour enregistrer le son de vos vidéos."
+          "cameraPermission": "Jokey uses your camera to record video jokes. For example, when you record a video joke, the footage is saved and shared on your Jokey profile for other users to watch.",
+          "microphonePermission": "Jokey uses your microphone to record audio jokes and video sound. For example, when you tap Record, your voice is captured and published as a joke for the community."
         }
       ],
       "./plugins/withEmbedDebugBundle.js",

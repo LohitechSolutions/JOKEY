@@ -1,0 +1,10 @@
+{
+  "ios": {
+    "infoPlist": {
+      "CFBundleDisplayName": "Jokey",
+      "NSMicrophoneUsageDescription": "Jokey utilise votre micro pour enregistrer des blagues audio et le son de vos vidéos. Par exemple, lorsque vous appuyez sur Enregistrer, votre voix est capturée et publiée pour la communauté.",
+      "NSCameraUsageDescription": "Jokey utilise votre caméra pour enregistrer des blagues vidéo. Par exemple, lorsque vous filmez une blague, la vidéo est enregistrée et partagée sur votre profil Jokey.",
+      "NSPhotoLibraryUsageDescription": "Jokey accède à votre photothèque pour vous permettre de choisir une photo de profil. Par exemple, la photo sélectionnée sera affichée sur votre profil public visible par les autres utilisateurs."
+    }
+  }
+}

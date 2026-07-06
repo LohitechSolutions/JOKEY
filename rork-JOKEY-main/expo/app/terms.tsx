@@ -57,6 +57,11 @@ export default function TermsScreen() {
       </View>
 
       <View style={styles.section}>
+        <Text style={styles.sectionTitle}>{t('terms.moderationTitle')}</Text>
+        <Text style={styles.sectionText}>{t('terms.moderationText')}</Text>
+      </View>
+
+      <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t('terms.subscriptionTitle')}</Text>
         <Text style={styles.sectionText}>{t('terms.subscriptionText')}</Text>
       </View>

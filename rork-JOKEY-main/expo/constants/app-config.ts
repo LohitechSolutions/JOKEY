@@ -1,4 +1,4 @@
-export const APP_VERSION = '1.13';
+export const APP_VERSION = '1.14';
 export const PRESERVED_STORAGE_KEYS = [
   'joky_preamble_accepted',
   'joky_settings',

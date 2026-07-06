@@ -471,6 +471,15 @@ export default function AuthScreen() {
                 </TouchableOpacity>
               )}
 
+              {mode === 'login' && (
+                <Text style={styles.loginTermsNotice}>
+                  {t('auth.loginTermsNotice')}{' '}
+                  <Link href="/terms" style={styles.legalLink}>{t('auth.termsLink')}</Link>
+                  {' '}{t('auth.and')}{' '}
+                  <Link href="/privacy" style={styles.legalLink}>{t('auth.privacyLink')}</Link>
+                </Text>
+              )}
+
               {mode === 'register' && (
                 <View style={styles.legalSection}>
                   <TouchableOpacity
@@ -820,5 +829,13 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     fontWeight: '700' as const,
     textDecorationLine: 'underline' as const,
+  },
+  loginTermsNotice: {
+    fontSize: 12,
+    color: Colors.textMuted,
+    textAlign: 'center' as const,
+    lineHeight: 18,
+    marginBottom: 12,
+    marginTop: 4,
   },
 });
