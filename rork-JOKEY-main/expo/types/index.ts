@@ -15,6 +15,15 @@ export interface User {
   isFollowing: boolean;
   badges: Badge[];
   createdAt: string;
+  isAdmin?: boolean;
+}
+
+export interface ImageJoke {
+  id: string;
+  title: string;
+  imageUrl: string;
+  createdBy: string | null;
+  createdAt: string;
 }
 
 export interface Joke {

@@ -32,6 +32,7 @@ import { showUnblockConfirm } from '@/lib/moderation-client';
 export default function SettingsScreen() {
   const router = useRouter();
   const {
+    currentUser,
     logout, deleteAccount, isLoggingOut, isDeletingAccount,
     settings, updateSettings,
     blockedUsers, unblockUser,
@@ -203,6 +204,27 @@ export default function SettingsScreen() {
           </View>
         )}
       </View>
+
+      {currentUser?.isAdmin ? (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{t('settings.admin')}</Text>
+          <TouchableOpacity
+            style={styles.settingRow}
+            onPress={() => router.push('/admin')}
+          >
+            <View style={styles.settingLeft}>
+              <View style={[styles.iconBox, { backgroundColor: Colors.primary + '15' }]}>
+                <Shield size={18} color={Colors.primary} />
+              </View>
+              <View>
+                <Text style={styles.settingText}>{t('settings.adminPanel')}</Text>
+                <Text style={styles.settingSubtext}>{t('settings.adminManageDrawings')}</Text>
+              </View>
+            </View>
+            <ChevronRight size={18} color={Colors.textMuted} />
+          </TouchableOpacity>
+        </View>
+      ) : null}
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t('settings.security')}</Text>

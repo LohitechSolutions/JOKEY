@@ -51,6 +51,7 @@ function supabaseUserToAppUser(supabaseUser: any, profile: any): User {
     badges: profile?.badges || [],
     createdAt: profile?.created_at || supabaseUser.created_at || new Date().toISOString(),
     isFollowing: false,
+    isAdmin: profile?.is_admin === true,
   };
 }
 

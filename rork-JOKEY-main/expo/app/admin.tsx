@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,54 +7,129 @@ import {
   TouchableOpacity,
   TextInput,
   Alert,
+  Image,
+  ActivityIndicator,
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
-import { ArrowLeft, Shield, Trash2 } from 'lucide-react-native';
+import { ArrowLeft, Shield, Trash2, ImagePlus } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useApp } from '@/contexts/AppContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { ImageJoke } from '@/types';
 
 export default function AdminScreen() {
   const router = useRouter();
-  const { isAdmin, toggleAdmin } = useApp();
+  const {
+    currentUser,
+    isAuthenticated,
+    imageJokes,
+    publishImageJoke,
+    deleteImageJoke,
+    isPublishingImageJoke,
+    isDeletingImageJoke,
+  } = useApp();
   const { t } = useLanguage();
-  const [adminCode, setAdminCode] = React.useState('');
+  const [title, setTitle] = useState('');
+  const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
 
-  const handleActivateAdmin = () => {
-    if (adminCode === 'admin123') {
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      toggleAdmin(true);
-      Alert.alert(t('admin.activatedTitle'), t('admin.activatedMsg'));
-      setAdminCode('');
-    } else {
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert(t('admin.wrongCode'), t('admin.wrongCodeMsg'));
+  const isAdmin = currentUser?.isAdmin === true;
+
+  const handlePickImage = useCallback(async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(t('admin.imagePermissionTitle'), t('admin.imagePermissionMsg'));
+      return;
     }
-  };
 
-  const handleDeactivateAdmin = () => {
-    Alert.alert(
-      t('admin.deactivateTitle'),
-      t('admin.deactivateMsg'),
-      [
-        { text: t('common.no'), style: 'cancel' },
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      quality: 0.9,
+      aspect: [4, 5],
+    });
+
+    if (!result.canceled && result.assets[0]?.uri) {
+      setSelectedImageUri(result.assets[0].uri);
+    }
+  }, [t]);
+
+  const handlePublish = useCallback(async () => {
+    if (!title.trim()) {
+      Alert.alert(t('admin.titleRequired'), t('admin.titleRequiredMsg'));
+      return;
+    }
+    if (!selectedImageUri) {
+      Alert.alert(t('admin.imageRequired'), t('admin.imageRequiredMsg'));
+      return;
+    }
+
+    try {
+      await publishImageJoke(title.trim(), selectedImageUri);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert(t('admin.publishedTitle'), t('admin.publishedMsg'));
+      setTitle('');
+      setSelectedImageUri(null);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : t('admin.publishFailed');
+      Alert.alert(t('auth.error'), message);
+    }
+  }, [title, selectedImageUri, publishImageJoke, t]);
+
+  const confirmDelete = useCallback(
+    (joke: ImageJoke) => {
+      Alert.alert(t('admin.deleteTitle'), t('admin.deleteMsg', { title: joke.title }), [
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: t('common.yes'),
+          text: t('profile.delete'),
+          style: 'destructive',
           onPress: () => {
-            toggleAdmin(false);
-            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            void (async () => {
+              try {
+                await deleteImageJoke(joke);
+                void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              } catch (err: unknown) {
+                const message = err instanceof Error ? err.message : t('admin.deleteFailed');
+                Alert.alert(t('auth.error'), message);
+              }
+            })();
           },
         },
-      ]
+      ]);
+    },
+    [deleteImageJoke, t]
+  );
+
+  if (!isAuthenticated) {
+    return (
+      <View style={styles.centered}>
+        <Stack.Screen options={{ title: t('admin.title') }} />
+        <Shield size={40} color={Colors.primary} />
+        <Text style={styles.centeredTitle}>{t('admin.loginRequired')}</Text>
+        <TouchableOpacity style={styles.primaryBtn} onPress={() => router.push('/auth')}>
+          <Text style={styles.primaryBtnText}>{t('auth.login')}</Text>
+        </TouchableOpacity>
+      </View>
     );
-  };
+  }
+
+  if (!isAdmin) {
+    return (
+      <View style={styles.centered}>
+        <Stack.Screen options={{ title: t('admin.title') }} />
+        <Shield size={40} color={Colors.error} />
+        <Text style={styles.centeredTitle}>{t('admin.accessDenied')}</Text>
+        <Text style={styles.centeredSubtitle}>{t('admin.accessDeniedMsg')}</Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Stack.Screen
         options={{
-          title: t('admin.title'),
+          title: t('admin.panelTitle'),
           headerLeft: () => (
             <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn}>
               <ArrowLeft size={22} color={Colors.text} />
@@ -67,61 +142,67 @@ export default function AdminScreen() {
         <View style={styles.adminIcon}>
           <Shield size={32} color={Colors.white} />
         </View>
-        <Text style={styles.headerTitle}>{t('admin.panelTitle')}</Text>
-        <Text style={styles.headerSubtitle}>
-          {t('admin.panelDesc')}
-        </Text>
+        <Text style={styles.headerTitle}>{t('admin.imageJokesTitle')}</Text>
+        <Text style={styles.headerSubtitle}>{t('admin.imageJokesDesc')}</Text>
       </View>
 
-      {!isAdmin ? (
-        <View style={styles.loginSection}>
-          <Text style={styles.loginTitle}>{t('admin.accessTitle')}</Text>
-          <Text style={styles.loginDesc}>
-            {t('admin.accessDesc')}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>{t('admin.publishNew')}</Text>
+        <TextInput
+          style={styles.input}
+          placeholder={t('admin.imageJokeTitlePlaceholder')}
+          placeholderTextColor={Colors.textMuted}
+          value={title}
+          onChangeText={setTitle}
+          maxLength={120}
+        />
+
+        <TouchableOpacity style={styles.pickImageBtn} onPress={handlePickImage}>
+          <ImagePlus size={20} color={Colors.primary} />
+          <Text style={styles.pickImageText}>
+            {selectedImageUri ? t('admin.changeImage') : t('admin.pickImage')}
           </Text>
-          <View style={styles.codeInputGroup}>
-            <Shield size={18} color={Colors.primary} />
-            <TextInput
-              style={styles.codeInput}
-              placeholder={t('admin.codePlaceholder')}
-              placeholderTextColor={Colors.textMuted}
-              value={adminCode}
-              onChangeText={setAdminCode}
-              secureTextEntry
-              autoCapitalize="none"
-            />
-          </View>
-          <TouchableOpacity style={styles.activateBtn} onPress={handleActivateAdmin}>
-            <Text style={styles.activateBtnText}>{t('admin.activate')}</Text>
-          </TouchableOpacity>
-          <Text style={styles.hint}>{t('admin.hint')}</Text>
-        </View>
-      ) : (
-        <>
-          <View style={styles.statusBadge}>
-            <Shield size={18} color={Colors.success} />
-            <Text style={styles.statusText}>{t('admin.active')}</Text>
-          </View>
+        </TouchableOpacity>
 
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Shield size={20} color={Colors.primary} />
-              <Text style={styles.sectionTitle}>{t('admin.info')}</Text>
-            </View>
-            <View style={styles.infoCard}>
-              <Text style={styles.infoLabel}>{t('admin.howItWorks')}</Text>
-              <Text style={styles.infoValue}>
-                {t('admin.howItWorks')}
-              </Text>
-            </View>
-          </View>
+        {selectedImageUri ? (
+          <Image source={{ uri: selectedImageUri }} style={styles.preview} resizeMode="cover" />
+        ) : null}
 
-          <TouchableOpacity style={styles.deactivateBtn} onPress={handleDeactivateAdmin}>
-            <Trash2 size={16} color={Colors.error} />
-            <Text style={styles.deactivateBtnText}>{t('admin.deactivate')}</Text>
-          </TouchableOpacity>
-        </>
-      )}
+        <TouchableOpacity
+          style={[styles.primaryBtn, isPublishingImageJoke && styles.disabledBtn]}
+          onPress={handlePublish}
+          disabled={isPublishingImageJoke}
+        >
+          {isPublishingImageJoke ? (
+            <ActivityIndicator color={Colors.accent} />
+          ) : (
+            <Text style={styles.primaryBtnText}>{t('admin.publish')}</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>{t('admin.publishedList')}</Text>
+        {imageJokes.length === 0 ? (
+          <Text style={styles.emptyText}>{t('admin.noImageJokes')}</Text>
+        ) : (
+          imageJokes.map((joke) => (
+            <View key={joke.id} style={styles.listItem}>
+              <Image source={{ uri: joke.imageUrl }} style={styles.thumbnail} />
+              <View style={styles.listText}>
+                <Text style={styles.listTitle} numberOfLines={2}>{joke.title}</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.deleteBtn}
+                onPress={() => confirmDelete(joke)}
+                disabled={isDeletingImageJoke}
+              >
+                <Trash2 size={18} color={Colors.error} />
+              </TouchableOpacity>
+            </View>
+          ))
+        )}
+      </View>
     </ScrollView>
   );
 }
@@ -150,11 +231,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 14,
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 8,
   },
   headerTitle: {
     fontSize: 24,
@@ -167,83 +243,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
     textAlign: 'center',
     paddingHorizontal: 40,
-  },
-  loginSection: {
-    marginHorizontal: 20,
-    backgroundColor: Colors.card,
-    borderRadius: 20,
-    padding: 24,
-    borderWidth: 1.5,
-    borderColor: Colors.cardBorder,
-  },
-  loginTitle: {
-    fontSize: 18,
-    fontWeight: '700' as const,
-    color: Colors.primary,
-    marginBottom: 6,
-  },
-  loginDesc: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    marginBottom: 20,
     lineHeight: 20,
-  },
-  codeInputGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surfaceLight,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    borderWidth: 1.5,
-    borderColor: Colors.cardBorder,
-    marginBottom: 16,
-    gap: 10,
-  },
-  codeInput: {
-    flex: 1,
-    fontSize: 16,
-    color: Colors.text,
-    paddingVertical: 14,
-  },
-  activateBtn: {
-    backgroundColor: Colors.primary,
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: 'center',
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 5,
-  },
-  activateBtnText: {
-    fontSize: 16,
-    fontWeight: '700' as const,
-    color: Colors.accent,
-  },
-  hint: {
-    fontSize: 12,
-    color: Colors.textMuted,
-    textAlign: 'center',
-    marginTop: 14,
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: Colors.success + '15',
-    marginHorizontal: 20,
-    padding: 12,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: Colors.success + '40',
-    marginBottom: 20,
-  },
-  statusText: {
-    fontSize: 15,
-    fontWeight: '700' as const,
-    color: Colors.success,
   },
   section: {
     marginHorizontal: 20,
@@ -254,49 +254,107 @@ const styles = StyleSheet.create({
     borderColor: Colors.cardBorder,
     marginBottom: 16,
   },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 16,
-  },
   sectionTitle: {
     fontSize: 17,
     fontWeight: '700' as const,
     color: Colors.primary,
+    marginBottom: 14,
   },
-  infoCard: {
+  input: {
     backgroundColor: Colors.surfaceLight,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 10,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: Colors.cardBorder,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: Colors.text,
+    marginBottom: 14,
   },
-  infoLabel: {
-    fontSize: 12,
-    fontWeight: '700' as const,
-    color: Colors.primary,
-    marginBottom: 4,
-  },
-  infoValue: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    lineHeight: 18,
-  },
-  deactivateBtn: {
+  pickImageBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginHorizontal: 20,
-    backgroundColor: Colors.card,
-    borderRadius: 14,
-    paddingVertical: 16,
     gap: 8,
+    borderRadius: 14,
     borderWidth: 1.5,
-    borderColor: Colors.error + '40',
+    borderColor: Colors.primary + '60',
+    paddingVertical: 14,
+    marginBottom: 14,
   },
-  deactivateBtnText: {
+  pickImageText: {
     fontSize: 15,
     fontWeight: '700' as const,
-    color: Colors.error,
+    color: Colors.primary,
+  },
+  preview: {
+    width: '100%',
+    height: 260,
+    borderRadius: 14,
+    marginBottom: 14,
+    backgroundColor: Colors.surfaceLight,
+  },
+  primaryBtn: {
+    backgroundColor: Colors.primary,
+    borderRadius: 14,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  primaryBtnText: {
+    fontSize: 16,
+    fontWeight: '700' as const,
+    color: Colors.accent,
+  },
+  disabledBtn: {
+    opacity: 0.7,
+  },
+  listItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.cardBorder,
+  },
+  thumbnail: {
+    width: 56,
+    height: 56,
+    borderRadius: 10,
+    backgroundColor: Colors.surfaceLight,
+  },
+  listText: {
+    flex: 1,
+  },
+  listTitle: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: Colors.white,
+  },
+  deleteBtn: {
+    padding: 8,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: Colors.textMuted,
+  },
+  centered: {
+    flex: 1,
+    backgroundColor: Colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    gap: 12,
+  },
+  centeredTitle: {
+    fontSize: 20,
+    fontWeight: '800' as const,
+    color: Colors.white,
+    textAlign: 'center',
+  },
+  centeredSubtitle: {
+    fontSize: 14,
+    color: Colors.textMuted,
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });
