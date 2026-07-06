@@ -27,14 +27,17 @@ CREATE INDEX IF NOT EXISTS idx_blocked_users_blocker ON blocked_users(blocker_id
 ALTER TABLE reports ENABLE ROW LEVEL SECURITY;
 ALTER TABLE blocked_users ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can insert their own reports" ON reports;
 CREATE POLICY "Users can insert their own reports"
   ON reports FOR INSERT
   WITH CHECK (auth.uid() = reporter_id);
 
+DROP POLICY IF EXISTS "Users can view their own reports" ON reports;
 CREATE POLICY "Users can view their own reports"
   ON reports FOR SELECT
   USING (auth.uid() = reporter_id);
 
+DROP POLICY IF EXISTS "Users can manage their own blocks" ON blocked_users;
 CREATE POLICY "Users can manage their own blocks"
   ON blocked_users FOR ALL
   USING (auth.uid() = blocker_id)
