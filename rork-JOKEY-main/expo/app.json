@@ -16,15 +16,35 @@
         "exclude": ["expo-location"]
       }
     },
+    "locales": {
+      "en": "./locales/en.json",
+      "fr": "./locales/fr.json",
+      "ar": "./locales/ar.json"
+    },
     "splash": {
       "image": "./assets/images/splash-icon.jpeg",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
+      "bundleIdentifier": "app.rork.azbb4413e811lknfmyslw",
       "buildNumber": "14",
-      "bundleIdentifier": "app.rork.azbb4413e811lknfmyslw"
+      "infoPlist": {
+        "CFBundleLocalizations": ["en", "fr", "ar"],
+        "CFBundleDevelopmentRegion": "en",
+        "NSMicrophoneUsageDescription": "Jokey uses your microphone to record audio jokes and video sound. For example, when you tap Record, your voice is captured and published as a joke for the community.",
+        "NSCameraUsageDescription": "Jokey uses your camera to record video jokes. For example, when you record a video joke, the footage is saved and shared on your Jokey profile for other users to watch.",
+        "NSPhotoLibraryUsageDescription": "Jokey accesses your photo library so you can choose a profile picture. For example, the photo you select will be displayed on your public profile for other users to see."
+      },
+      "privacyManifests": {
+        "NSPrivacyAccessedAPITypes": [
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+            "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
+          }
+        ]
+      }
     },
     "android": {
       "versionCode": 14,
@@ -54,10 +74,16 @@
       "expo-web-browser",
       "expo-audio",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "Jokey accesses your photo library so you can choose a profile picture. For example, the photo you select will be displayed on your public profile for other users to see."
+        }
+      ],
+      [
         "expo-camera",
         {
-          "cameraPermission": "Jokey utilise la caméra pour enregistrer vos vidéos.",
-          "microphonePermission": "Jokey utilise le micro pour enregistrer le son de vos vidéos."
+          "cameraPermission": "Jokey uses your camera to record video jokes. For example, when you record a video joke, the footage is saved and shared on your Jokey profile for other users to watch.",
+          "microphonePermission": "Jokey uses your microphone to record audio jokes and video sound. For example, when you tap Record, your voice is captured and published as a joke for the community."
         }
       ],
       "./plugins/withEmbedDebugBundle.js",

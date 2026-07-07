@@ -43,14 +43,14 @@ function formatDuration(seconds: number): string {
 
 export default function RankingScreen() {
   const router = useRouter();
-  const { jokes, playingJokeId, playJoke, pauseAudio, globalAudioStatus, rateJoke, getMyRating } = useApp();
+  const { visibleJokes, playingJokeId, playJoke, pauseAudio, globalAudioStatus, rateJoke, getMyRating } = useApp();
   const { t } = useLanguage();
 
   const rankedJokes = useMemo(() => {
-    return [...jokes]
+    return [...visibleJokes]
       .sort((a, b) => b.averageRating - a.averageRating || b.totalRatings - a.totalRatings)
       .slice(0, 100);
-  }, [jokes]);
+  }, [visibleJokes]);
 
   const isJokeActive = useCallback(
     (jokeId: string) => playingJokeId === jokeId && globalAudioStatus.playing,

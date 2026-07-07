@@ -15,14 +15,16 @@ void SplashScreen.preventAutoHideAsync();
 const queryClient = new QueryClient();
 
 function RootLayoutNav() {
-  const { isAuthenticated, authChecked, isPasswordRecovery } = useApp();
+  const { isAuthenticated, authChecked, isPasswordRecovery, preambleAccepted } = useApp();
   const router = useRouter();
   const segments = useSegments();
 
   useEffect(() => {
-    if (!authChecked) return;
+    if (!authChecked || preambleAccepted === null) return;
 
     const inAuthScreen = segments[0] === 'auth';
+    const inPreambleScreen = segments[0] === 'preamble';
+    const inLegalScreen = segments[0] === 'privacy' || segments[0] === 'terms';
 
     if (isPasswordRecovery && !inAuthScreen) {
       console.log('[RootLayout] Password recovery — redirecting to auth');
@@ -30,16 +32,22 @@ function RootLayoutNav() {
       return;
     }
 
-    if (!isAuthenticated && !inAuthScreen) {
+    if (!preambleAccepted && !inPreambleScreen && !inLegalScreen) {
+      console.log('[RootLayout] Preamble not accepted — redirecting to preamble');
+      router.replace('/preamble');
+      return;
+    }
+
+    if (preambleAccepted && !isAuthenticated && !inAuthScreen && !inLegalScreen) {
       console.log('[RootLayout] Not authenticated, redirecting to auth');
       router.replace('/auth');
     } else if (isAuthenticated && inAuthScreen && !isPasswordRecovery) {
       console.log('[RootLayout] Authenticated, redirecting to home');
       router.replace('/');
     }
-  }, [isAuthenticated, authChecked, isPasswordRecovery, segments, router]);
+  }, [isAuthenticated, authChecked, isPasswordRecovery, preambleAccepted, segments, router]);
 
-  if (!authChecked) {
+  if (!authChecked || preambleAccepted === null) {
     return (
       <View style={loadingStyles.container}>
         <ActivityIndicator size="large" color={Colors.primary} />
@@ -57,6 +65,7 @@ function RootLayoutNav() {
       }}
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="preamble" options={{ headerShown: false }} />
       <Stack.Screen name="auth" options={{ headerShown: false, presentation: 'modal' }} />
       <Stack.Screen name="joke/[id]" options={{ title: 'Blague' }} />
       <Stack.Screen name="user/[id]" options={{ title: 'Profil' }} />

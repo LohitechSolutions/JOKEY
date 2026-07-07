@@ -25,13 +25,17 @@ import {
 import Colors from '@/constants/colors';
 import { useApp } from '@/contexts/AppContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { APP_VERSION, PRIVACY_POLICY_URL } from '@/constants/app-config';
 import { LANGUAGE_OPTIONS } from '@/constants/translations';
+import { showUnblockConfirm } from '@/lib/moderation-client';
 
 export default function SettingsScreen() {
   const router = useRouter();
   const {
+    currentUser,
     logout, deleteAccount, isLoggingOut, isDeletingAccount,
     settings, updateSettings,
+    blockedUsers, unblockUser,
   } = useApp();
   // App is fully free - no subscription needed
   const { t, language, changeLanguage } = useLanguage();
@@ -201,6 +205,27 @@ export default function SettingsScreen() {
         )}
       </View>
 
+      {currentUser?.isAdmin ? (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{t('settings.admin')}</Text>
+          <TouchableOpacity
+            style={styles.settingRow}
+            onPress={() => router.push('/admin')}
+          >
+            <View style={styles.settingLeft}>
+              <View style={[styles.iconBox, { backgroundColor: Colors.primary + '15' }]}>
+                <Shield size={18} color={Colors.primary} />
+              </View>
+              <View>
+                <Text style={styles.settingText}>{t('settings.adminPanel')}</Text>
+                <Text style={styles.settingSubtext}>{t('settings.adminManageDrawings')}</Text>
+              </View>
+            </View>
+            <ChevronRight size={18} color={Colors.textMuted} />
+          </TouchableOpacity>
+        </View>
+      ) : null}
+
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t('settings.security')}</Text>
         <TouchableOpacity
@@ -218,6 +243,28 @@ export default function SettingsScreen() {
           </View>
           <ChevronRight size={18} color={Colors.textMuted} />
         </TouchableOpacity>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>{t('moderation.blockedUsers')}</Text>
+        {blockedUsers.length === 0 ? (
+          <View style={styles.settingRow}>
+            <Text style={styles.settingSubtext}>{t('moderation.noBlockedUsers')}</Text>
+          </View>
+        ) : (
+          blockedUsers.map((entry) => (
+            <TouchableOpacity
+              key={entry.id}
+              style={styles.settingRow}
+              onPress={() => {
+                showUnblockConfirm(t, entry.username, () => void unblockUser(entry.id));
+              }}
+            >
+              <Text style={styles.settingText}>@{entry.username}</Text>
+              <Text style={styles.unblockText}>{t('moderation.unblock')}</Text>
+            </TouchableOpacity>
+          ))
+        )}
       </View>
 
       <View style={styles.section}>
@@ -282,7 +329,8 @@ export default function SettingsScreen() {
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.version}>Jokey v1.0.0</Text>
+      <Text style={styles.version}>Jokey v{APP_VERSION}</Text>
+      <Text style={styles.privacyUrl}>{PRIVACY_POLICY_URL}</Text>
     </ScrollView>
   );
 }
@@ -387,6 +435,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.textMuted,
     marginTop: 20,
+  },
+  privacyUrl: {
+    textAlign: 'center',
+    fontSize: 11,
+    color: Colors.textMuted,
+    marginTop: 4,
+  },
+  unblockText: {
+    fontSize: 13,
+    color: Colors.primary,
+    fontWeight: '600' as const,
   },
   langPicker: {
     marginTop: 6,

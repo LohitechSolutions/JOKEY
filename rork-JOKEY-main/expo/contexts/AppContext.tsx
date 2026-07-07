@@ -3,13 +3,29 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import createContextHook from '@nkzw/create-context-hook';
 import { Platform } from 'react-native';
-import { User, Joke, Video, ReactionEmoji, SubscriptionPlan } from '@/types';
+import { User, Joke, Video, ReactionEmoji, SubscriptionPlan, ImageJoke } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { setCachedUser, getCachedUser } from '@/lib/auth-storage';
 import { clientRegister, clientLogin, clientDeleteAccount, clientRequestPasswordReset, clientConfirmPasswordReset, signOutSupabase, clientGetMe } from '@/lib/auth-client';
 import { handleAuthDeepLink } from '@/lib/auth-deep-link';
 import * as Linking from 'expo-linking';
 import { ensureDBReady, fetchJokesFromDB, fetchVideosFromDB, toggleReactionInDB, rateJokeInDB, toggleFollowInDB, deleteJokeFromDB, deleteVideoFromDB, ensureUserRecordExists, uploadAvatarToSupabase, updateUserProfileInDB, refreshUserProfileStats, fetchFollowingIdsFromDB, fetchTotalUserCount } from '@/lib/db-client';
+import { filterJokes, filterVideos } from '@/lib/content-filter';
+import {
+  getBlockedUserIds,
+  getBlockedUsers,
+  syncBlockedUsersFromDB,
+  blockUser as blockUserInStorage,
+  unblockUser as unblockUserInStorage,
+  submitReport,
+  type ReportPayload,
+  type BlockedUserEntry,
+} from '@/lib/moderation-client';
+import {
+  fetchImageJokesFromDB,
+  publishImageJoke as publishImageJokeToDB,
+  deleteImageJokeFromDB,
+} from '@/lib/image-jokes-client';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 
@@ -28,6 +44,7 @@ const STORAGE_KEYS = {
   LISTEN_COUNT: 'joky_listen_count',
   CREATE_COUNT: 'joky_create_count',
   TIPS_BALANCE: 'joky_tips_balance',
+  PREAMBLE_ACCEPTED: 'joky_preamble_accepted',
 };
 
 
@@ -52,6 +69,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const [authError, setAuthError] = useState<string | null>(null);
   const [jokes, setJokes] = useState<Joke[]>([]);
   const [videos, setVideos] = useState<Video[]>([]);
+  const [imageJokes, setImageJokes] = useState<ImageJoke[]>([]);
   const [followingIds, setFollowingIds] = useState<string[]>([]);
   const [myReactions, setMyReactions] = useState<Record<string, ReactionEmoji[]>>({});
   const [myRatings, setMyRatings] = useState<Record<string, number>>({});
@@ -65,6 +83,9 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const [tipsBalance, setTipsBalance] = useState<Record<string, number>>({});
   const [dbReady, setDbReady] = useState<boolean>(false);
   const [totalUsers, setTotalUsers] = useState<number>(0);
+  const [blockedUserIds, setBlockedUserIds] = useState<string[]>([]);
+  const [blockedUsers, setBlockedUsers] = useState<BlockedUserEntry[]>([]);
+  const [preambleAccepted, setPreambleAccepted] = useState<boolean | null>(null);
 
   const globalPlayer = useAudioPlayer(null);
   const globalAudioStatus = useAudioPlayerStatus(globalPlayer);
@@ -260,6 +281,16 @@ export const [AppProvider, useApp] = createContextHook(() => {
     staleTime: 60 * 1000,
   });
 
+  const imageJokesQuery = useQuery({
+    queryKey: ['image-jokes-list'],
+    queryFn: async () => {
+      console.log('[AppContext] Fetching image jokes...');
+      return fetchImageJokesFromDB();
+    },
+    retry: 1,
+    staleTime: 60 * 1000,
+  });
+
   useEffect(() => {
     if (authQuery.isFetched) {
       if (authQuery.data && isPasswordRecoveryResult(authQuery.data)) {
@@ -290,12 +321,21 @@ export const [AppProvider, useApp] = createContextHook(() => {
 
     const syncProfile = async () => {
       try {
-        const [stats, following] = await Promise.all([
+        const [stats, following, adminResult] = await Promise.all([
           refreshUserProfileStats(currentUser.id),
           fetchFollowingIdsFromDB(currentUser.id),
+          supabase.from('users').select('is_admin').eq('id', currentUser.id).single(),
         ]);
         if (cancelled) return;
-        setCurrentUser((prev) => (prev ? { ...prev, ...stats } : prev));
+        setCurrentUser((prev) =>
+          prev
+            ? {
+                ...prev,
+                ...stats,
+                isAdmin: adminResult.data?.is_admin === true,
+              }
+            : prev
+        );
         setFollowingIds(following);
       } catch (err) {
         console.warn('[AppContext] Profile stats sync failed:', err);
@@ -378,18 +418,25 @@ export const [AppProvider, useApp] = createContextHook(() => {
   }, [authQuery.isError, authQuery.error]);
 
   useEffect(() => {
-    if (jokesQuery.data && jokesQuery.data.length > 0) {
+    if (jokesQuery.data !== undefined) {
       setJokes(jokesQuery.data);
       console.log('[AppContext] Loaded', jokesQuery.data.length, 'jokes from Supabase');
     }
   }, [jokesQuery.data]);
 
   useEffect(() => {
-    if (videosQuery.data && videosQuery.data.length > 0) {
+    if (videosQuery.data !== undefined) {
       setVideos(videosQuery.data);
       console.log('[AppContext] Loaded', videosQuery.data.length, 'videos from Supabase');
     }
   }, [videosQuery.data]);
+
+  useEffect(() => {
+    if (imageJokesQuery.data !== undefined) {
+      setImageJokes(imageJokesQuery.data);
+      console.log('[AppContext] Loaded', imageJokesQuery.data.length, 'image jokes');
+    }
+  }, [imageJokesQuery.data]);
 
   const subscriptionQuery = useQuery({
     queryKey: ['subscription-local'],
@@ -430,6 +477,23 @@ export const [AppProvider, useApp] = createContextHook(() => {
     },
   });
 
+  const preambleQuery = useQuery({
+    queryKey: ['preamble-accepted'],
+    queryFn: async () => {
+      const stored = await AsyncStorage.getItem(STORAGE_KEYS.PREAMBLE_ACCEPTED);
+      return stored === 'true';
+    },
+  });
+
+  const blockedUsersQuery = useQuery({
+    queryKey: ['blocked-users', currentUser?.id],
+    queryFn: async () => {
+      if (!currentUser?.id) return [] as BlockedUserEntry[];
+      return syncBlockedUsersFromDB(currentUser.id);
+    },
+    enabled: Boolean(currentUser?.id),
+  });
+
   useEffect(() => {
     if (subscriptionQuery.data !== undefined) {
       setIsSubscribed(subscriptionQuery.data.subscribed);
@@ -452,6 +516,27 @@ export const [AppProvider, useApp] = createContextHook(() => {
   useEffect(() => {
     if (settingsQuery.data) setSettings(settingsQuery.data);
   }, [settingsQuery.data]);
+
+  useEffect(() => {
+    if (preambleQuery.data !== undefined) setPreambleAccepted(preambleQuery.data);
+  }, [preambleQuery.data]);
+
+  useEffect(() => {
+    if (blockedUsersQuery.data) {
+      setBlockedUsers(blockedUsersQuery.data);
+      setBlockedUserIds(blockedUsersQuery.data.map((e) => e.id));
+    }
+  }, [blockedUsersQuery.data]);
+
+  const visibleJokes = useMemo(
+    () => filterJokes(jokes, { safeMode: settings.safeMode, blockedUserIds }),
+    [jokes, settings.safeMode, blockedUserIds]
+  );
+
+  const visibleVideos = useMemo(
+    () => filterVideos(videos, { safeMode: settings.safeMode, blockedUserIds }),
+    [videos, settings.safeMode, blockedUserIds]
+  );
 
   const authMutation = useMutation({
     mutationFn: async (input: { type: 'register'; username: string; email: string; password: string; role?: string } | { type: 'login'; email: string; password: string }) => {
@@ -623,9 +708,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     },
     onError: (error: Error) => {
       console.error('[AppContext] Delete account error:', error.message);
-      setCurrentUser(null);
-      setIsAuthenticated(false);
-      queryClient.setQueryData(['auth-restore'], null);
+      setAuthError(error.message);
     },
   });
 
@@ -1017,6 +1100,49 @@ export const [AppProvider, useApp] = createContextHook(() => {
     updateSettingsMutation.mutate(newSettings);
   }, [updateSettingsMutation]);
 
+  const acceptPreamble = useCallback(async () => {
+    await AsyncStorage.setItem(STORAGE_KEYS.PREAMBLE_ACCEPTED, 'true');
+    setPreambleAccepted(true);
+    queryClient.setQueryData(['preamble-accepted'], true);
+  }, [queryClient]);
+
+  const isUserBlocked = useCallback(
+    (userId: string) => blockedUserIds.includes(userId),
+    [blockedUserIds]
+  );
+
+  const blockUser = useCallback(
+    async (userId: string, username?: string) => {
+      if (!currentUser?.id || userId === currentUser.id) return;
+      await blockUserInStorage(currentUser.id, userId, username);
+      const updated = await getBlockedUsers(currentUser.id);
+      setBlockedUsers(updated);
+      setBlockedUserIds(updated.map((e) => e.id));
+      queryClient.setQueryData(['blocked-users', currentUser.id], updated);
+    },
+    [currentUser?.id, queryClient]
+  );
+
+  const unblockUser = useCallback(
+    async (userId: string) => {
+      if (!currentUser?.id) return;
+      await unblockUserInStorage(currentUser.id, userId);
+      const updated = await getBlockedUsers(currentUser.id);
+      setBlockedUsers(updated);
+      setBlockedUserIds(updated.map((e) => e.id));
+      queryClient.setQueryData(['blocked-users', currentUser.id], updated);
+    },
+    [currentUser?.id, queryClient]
+  );
+
+  const reportContent = useCallback(
+    async (payload: Omit<ReportPayload, 'reporterId'>): Promise<boolean> => {
+      if (!currentUser?.id) return false;
+      return submitReport({ ...payload, reporterId: currentUser.id });
+    },
+    [currentUser?.id]
+  );
+
   const refreshJokes = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ['jokes-list'] });
   }, [queryClient]);
@@ -1024,6 +1150,50 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const refreshVideos = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ['videos-list'] });
   }, [queryClient]);
+
+  const refreshImageJokes = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ['image-jokes-list'] });
+  }, [queryClient]);
+
+  const publishImageJokeMutation = useMutation({
+    mutationFn: async ({ title, localImageUri }: { title: string; localImageUri: string }) => {
+      if (!currentUser?.id) throw new Error('Not authenticated');
+      if (!currentUser.isAdmin) throw new Error('Admin access required');
+      return publishImageJokeToDB(title, localImageUri, currentUser.id);
+    },
+    onSuccess: (joke) => {
+      setImageJokes((prev) => [joke, ...prev]);
+      queryClient.setQueryData<ImageJoke[]>(['image-jokes-list'], (prev) => [joke, ...(prev ?? [])]);
+    },
+  });
+
+  const deleteImageJokeMutation = useMutation({
+    mutationFn: async (joke: ImageJoke) => {
+      if (!currentUser?.isAdmin) throw new Error('Admin access required');
+      await deleteImageJokeFromDB(joke);
+      return joke.id;
+    },
+    onSuccess: (jokeId) => {
+      setImageJokes((prev) => prev.filter((j) => j.id !== jokeId));
+      queryClient.setQueryData<ImageJoke[]>(['image-jokes-list'], (prev) =>
+        (prev ?? []).filter((j) => j.id !== jokeId)
+      );
+    },
+  });
+
+  const publishImageJoke = useCallback(
+    async (title: string, localImageUri: string) => {
+      return publishImageJokeMutation.mutateAsync({ title, localImageUri });
+    },
+    [publishImageJokeMutation]
+  );
+
+  const deleteImageJoke = useCallback(
+    async (joke: ImageJoke) => {
+      await deleteImageJokeMutation.mutateAsync(joke);
+    },
+    [deleteImageJokeMutation]
+  );
 
   // ─── Global audio play / pause ────────────────────────────────────────────
 
@@ -1135,6 +1305,9 @@ export const [AppProvider, useApp] = createContextHook(() => {
     authError,
     jokes,
     videos,
+    imageJokes,
+    visibleJokes,
+    visibleVideos,
     followingIds,
     playingJokeId,
     setPlayingJokeId,
@@ -1177,10 +1350,23 @@ export const [AppProvider, useApp] = createContextHook(() => {
     toggleAdmin,
     settings,
     updateSettings,
+    preambleAccepted,
+    acceptPreamble,
+    blockedUserIds,
+    blockedUsers,
+    blockUser,
+    unblockUser,
+    isUserBlocked,
+    reportContent,
     backendAvailable: dbReady,
     directDBAvailable: dbReady,
     refreshJokes,
     refreshVideos,
+    refreshImageJokes,
+    publishImageJoke,
+    deleteImageJoke,
+    isPublishingImageJoke: publishImageJokeMutation.isPending,
+    isDeletingImageJoke: deleteImageJokeMutation.isPending,
     totalUsers,
     isLoading: authQuery.isLoading,
     isRegistering: authMutation.isPending && (authMutation.variables as any)?.type === 'register',
@@ -1194,7 +1380,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     isPasswordRecovery,
     setIsPasswordRecovery,
   }), [
-    currentUser, isAuthenticated, authChecked, authError, jokes, videos, followingIds,
+    currentUser, isAuthenticated, authChecked, authError, jokes, videos, imageJokes, visibleJokes, visibleVideos, followingIds,
     playingJokeId, playJoke, pauseAudio, globalAudioStatus,
     login, register, logout, deleteAccount, updateProfile, updateProfileMutation.isPending, toggleFollow,
     addReaction, rateJoke, addJoke, addVideo, updateJokeCommentsCount, deleteJoke, deleteVideo, deleteJokeMutation.isPending, deleteVideoMutation.isPending, isFollowing, getJokeReactions, getMyRating,
@@ -1202,8 +1388,12 @@ export const [AppProvider, useApp] = createContextHook(() => {
     listenCount, createCount, incrementListenCount, incrementCreateCount,
     canListen, canCreate, sendTip, getTipsForUser, tipsBalance,
     isAdmin, toggleAdmin,
-    settings, updateSettings, dbReady,
-    refreshJokes, refreshVideos, totalUsers, authQuery.isLoading, authMutation.isPending, authMutation.variables,
+    settings, updateSettings, preambleAccepted, acceptPreamble,
+    blockedUserIds, blockedUsers, blockUser, unblockUser, isUserBlocked, reportContent,
+    dbReady,
+    refreshJokes, refreshVideos, refreshImageJokes, publishImageJoke, deleteImageJoke,
+    publishImageJokeMutation.isPending, deleteImageJokeMutation.isPending,
+    totalUsers, authQuery.isLoading, authMutation.isPending, authMutation.variables,
     logoutMutation.isPending, deleteMutation.isPending,
     requestPasswordReset, confirmPasswordReset,
     requestPasswordResetMutation.isPending, confirmPasswordResetMutation.isPending,

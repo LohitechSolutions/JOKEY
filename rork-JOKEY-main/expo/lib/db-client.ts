@@ -938,6 +938,8 @@ export async function deleteUserDataFromDB(userId: string): Promise<void> {
   try { await supabase.from('ratings').delete().eq('user_id', userId); } catch (e) { console.warn('[DB] delete ratings:', e); }
   try { await supabase.from('comments').delete().eq('user_id', userId); } catch (e) { console.warn('[DB] delete comments:', e); }
   try { await supabase.from('follows').delete().or(`follower_id.eq.${userId},following_id.eq.${userId}`); } catch (e) { console.warn('[DB] delete follows:', e); }
+  try { await supabase.from('blocked_users').delete().or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`); } catch (e) { console.warn('[DB] delete blocked_users:', e); }
+  try { await supabase.from('reports').delete().eq('reporter_id', userId); } catch (e) { console.warn('[DB] delete reports:', e); }
   try { await supabase.from('jokes').delete().eq('user_id', userId); } catch (e) { console.warn('[DB] delete jokes:', e); }
   try { await supabase.from('videos').delete().eq('user_id', userId); } catch (e) { console.warn('[DB] delete videos:', e); }
   try { await supabase.from('users').delete().eq('id', userId); } catch (e) { console.warn('[DB] delete user:', e); }

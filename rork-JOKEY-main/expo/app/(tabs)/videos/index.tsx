@@ -16,25 +16,25 @@ import VideoCard from '@/components/VideoCard';
 import { CATEGORIES } from '@/mocks/data';
 
 export default function VideosScreen() {
-  const { videos, refreshVideos } = useApp();
+  const { visibleVideos, refreshVideos } = useApp();
   const { t } = useLanguage();
   const [refreshing, setRefreshing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<JokeCategory | null>(null);
 
   const videoCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    videos.forEach(v => {
+    visibleVideos.forEach(v => {
       counts[v.category] = (counts[v.category] || 0) + 1;
     });
     return counts;
-  }, [videos]);
+  }, [visibleVideos]);
 
   const categoryVideos = useMemo(() => {
     if (!selectedCategory) return [];
-    return [...videos]
+    return [...visibleVideos]
       .filter(v => v.category === selectedCategory)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [selectedCategory, videos]);
+  }, [selectedCategory, visibleVideos]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);

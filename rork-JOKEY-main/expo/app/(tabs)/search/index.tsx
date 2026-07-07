@@ -20,7 +20,7 @@ type SearchTab = 'blagues' | 'createurs' | 'tags';
 
 export default function SearchScreen() {
   const router = useRouter();
-  const { jokes } = useApp();
+  const { visibleJokes } = useApp();
   const { t } = useLanguage();
   const [query, setQuery] = useState('');
   const [activeTab, setActiveTab] = useState<SearchTab>('blagues');
@@ -28,23 +28,23 @@ export default function SearchScreen() {
   const filteredJokes = useMemo(() => {
     if (!query.trim()) return [];
     const q = query.toLowerCase();
-    return jokes.filter(j =>
+    return visibleJokes.filter(j =>
       j.title.toLowerCase().includes(q) ||
       j.tags.some(t => t.toLowerCase().includes(q)) ||
       j.user.displayName.toLowerCase().includes(q) ||
       j.category.includes(q)
     );
-  }, [query, jokes]);
+  }, [query, visibleJokes]);
 
   const allUsers = useMemo(() => {
     const userMap = new Map<string, User>();
-    jokes.forEach(j => {
+    visibleJokes.forEach(j => {
       if (j.user && !userMap.has(j.userId)) {
         userMap.set(j.userId, j.user);
       }
     });
     return Array.from(userMap.values());
-  }, [jokes]);
+  }, [visibleJokes]);
 
   const filteredUsers = useMemo(() => {
     if (!query.trim()) return allUsers.slice(0, 5);
@@ -57,21 +57,21 @@ export default function SearchScreen() {
 
   const allTags = useMemo(() => {
     const tagSet = new Set<string>();
-    jokes.forEach(j => j.tags.forEach(t => tagSet.add(t)));
+    visibleJokes.forEach(j => j.tags.forEach(t => tagSet.add(t)));
     const tags = Array.from(tagSet);
     if (!query.trim()) return tags;
     return tags.filter(t => t.toLowerCase().includes(query.toLowerCase()));
-  }, [jokes, query]);
+  }, [visibleJokes, query]);
 
   const trendingJokes = useMemo(() => {
-    return [...jokes]
+    return [...visibleJokes]
       .sort((a, b) => {
         const aT = Object.values(a.reactions).reduce((s, c) => s + c, 0);
         const bT = Object.values(b.reactions).reduce((s, c) => s + c, 0);
         return bT - aT;
       })
       .slice(0, 3);
-  }, [jokes]);
+  }, [visibleJokes]);
 
   const handleUserPress = useCallback((userId: string) => {
     router.push(`/user/${userId}`);

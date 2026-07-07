@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase, isSupabaseConfigured } from './supabase';
+import { PRESERVED_STORAGE_KEYS } from '@/constants/app-config';
 import { getPasswordResetRedirectUrl } from './auth-deep-link';
 import { User } from '@/types';
 import { removeAuthToken } from './auth-storage';
@@ -50,6 +51,7 @@ function supabaseUserToAppUser(supabaseUser: any, profile: any): User {
     badges: profile?.badges || [],
     createdAt: profile?.created_at || supabaseUser.created_at || new Date().toISOString(),
     isFollowing: false,
+    isAdmin: profile?.is_admin === true,
   };
 }
 
@@ -383,6 +385,17 @@ export async function clientDeleteAccount(uid: string): Promise<void> {
     console.warn('[AuthClient] deleteUserData error (non-fatal):', err?.message);
   }
 
+  if (isSupabaseConfigured) {
+    try {
+      const { error } = await supabase.rpc('delete_own_account');
+      if (error) {
+        console.warn('[AuthClient] delete_own_account RPC failed:', error.message);
+      }
+    } catch (err: any) {
+      console.warn('[AuthClient] delete_own_account RPC error:', err?.message);
+    }
+  }
+
   try {
     await supabase.auth.signOut();
   } catch (err) {
@@ -427,7 +440,11 @@ export async function signOutSupabase(): Promise<void> {
   }
   try {
     const allKeys = await AsyncStorage.getAllKeys();
-    const jokyKeys = allKeys.filter(k => k.startsWith('joky_'));
+    const jokyKeys = allKeys.filter(
+      (k) =>
+        k.startsWith('joky_') &&
+        !PRESERVED_STORAGE_KEYS.includes(k as (typeof PRESERVED_STORAGE_KEYS)[number])
+    );
     if (jokyKeys.length > 0) {
       await AsyncStorage.multiRemove(jokyKeys);
       console.log('[AuthClient] Cleared', jokyKeys.length, 'joky keys from storage');

@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Play, Pause, Send, Clock, ArrowLeft, Share2 } from 'lucide-react-native';
+import { Play, Pause, Send, Clock, ArrowLeft, Share2, Flag } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useApp } from '@/contexts/AppContext';
@@ -23,6 +23,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { CATEGORIES, REACTION_EMOJIS } from '@/mocks/data';
 import { ReactionEmoji, Comment } from '@/types';
 import { addCommentToDB, fetchCommentsFromDB } from '@/lib/db-client';
+import { handleReport as runReportFlow } from '@/lib/moderation-client';
 
 function formatDuration(seconds: number): string {
   const mins = Math.floor(seconds / 60);
@@ -48,6 +49,8 @@ export default function JokeDetailScreen() {
   const queryClient = useQueryClient();
   const {
     jokes,
+    visibleJokes,
+    blockedUserIds,
     currentUser,
     isAuthenticated,
     playingJokeId,
@@ -58,11 +61,16 @@ export default function JokeDetailScreen() {
     getJokeReactions,
     totalReactions,
     updateJokeCommentsCount,
+    reportContent,
   } = useApp();
   const [commentText, setCommentText] = useState('');
 
   const { t } = useLanguage();
-  const joke = useMemo(() => jokes.find(j => j.id === id), [jokes, id]);
+  const joke = useMemo(() => visibleJokes.find(j => j.id === id), [visibleJokes, id]);
+  const hiddenJoke = useMemo(
+    () => !joke ? jokes.find(j => j.id === id) ?? null : null,
+    [joke, jokes, id]
+  );
   const myReactions = joke ? getJokeReactions(joke.id) : [];
   const category = joke ? CATEGORIES.find(c => c.id === joke.category) : null;
 
@@ -72,7 +80,10 @@ export default function JokeDetailScreen() {
     enabled: Boolean(id),
   });
 
-  const comments = commentsQuery.data ?? [];
+  const comments = useMemo(
+    () => (commentsQuery.data ?? []).filter((c) => !blockedUserIds.includes(c.userId)),
+    [commentsQuery.data, blockedUserIds]
+  );
   const commentsCount = joke?.commentsCount ?? comments.length;
 
   const addCommentMutation = useMutation({
@@ -154,6 +165,31 @@ export default function JokeDetailScreen() {
     }
   }, [joke, t]);
 
+  const handleReportJoke = useCallback(() => {
+    if (!joke) return;
+    void runReportFlow(t, isAuthenticated, (reason) =>
+      reportContent({ targetType: 'joke', targetId: joke.id, reason })
+    );
+  }, [joke, t, isAuthenticated, reportContent]);
+
+  const handleReportComment = useCallback((commentId: string) => {
+    void runReportFlow(t, isAuthenticated, (reason) =>
+      reportContent({ targetType: 'comment', targetId: commentId, reason })
+    );
+  }, [t, isAuthenticated, reportContent]);
+
+  if (hiddenJoke) {
+    return (
+      <View style={styles.container}>
+        <Stack.Screen options={{ title: t('joke.title') }} />
+        <View style={styles.notFound}>
+          <Text style={styles.notFoundEmoji}>🔒</Text>
+          <Text style={styles.notFoundText}>{t('moderation.contentUnavailable')}</Text>
+        </View>
+      </View>
+    );
+  }
+
   if (!joke) {
     return (
       <View style={styles.container}>
@@ -178,6 +214,11 @@ export default function JokeDetailScreen() {
           headerLeft: () => (
             <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn}>
               <ArrowLeft size={22} color={Colors.text} />
+            </TouchableOpacity>
+          ),
+          headerRight: () => (
+            <TouchableOpacity onPress={handleReportJoke} style={styles.headerBtn}>
+              <Flag size={20} color={Colors.textMuted} />
             </TouchableOpacity>
           ),
         }}
@@ -284,7 +325,12 @@ export default function JokeDetailScreen() {
                 <View style={styles.commentBody}>
                   <View style={styles.commentHeader}>
                     <Text style={styles.commentUser}>@{comment.user.username}</Text>
-                    <Text style={styles.commentTime}>{timeAgo(comment.createdAt, t)}</Text>
+                    <View style={styles.commentHeaderRight}>
+                      <Text style={styles.commentTime}>{timeAgo(comment.createdAt, t)}</Text>
+                      <TouchableOpacity onPress={() => handleReportComment(comment.id)} hitSlop={8}>
+                        <Flag size={12} color={Colors.textMuted} />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                   <Text style={styles.commentText}>{comment.text}</Text>
                 </View>
@@ -573,6 +619,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 4,
+  },
+  commentHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   commentUser: {
     fontSize: 13,
