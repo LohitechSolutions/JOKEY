@@ -31,7 +31,7 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": false,
+      "supportsTablet": true,
       "bundleIdentifier": "app.rork.azbb4413e811lknfmyslw",
       "buildNumber": "14",
       "infoPlist": {
