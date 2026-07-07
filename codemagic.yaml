@@ -37,6 +37,7 @@ workflows:
         script: |
           export BUN_INSTALL="$HOME/.bun"
           export PATH="$BUN_INSTALL/bin:$PATH"
+          rm -rf ios
           NODE_ENV=production bunx expo prebuild --platform ios --no-install
       - name: Install CocoaPods dependencies
         script: |
@@ -62,9 +63,17 @@ workflows:
           agvtool new-version -all "$UPDATED_BUILD_NUMBER"
       - name: Build ipa for distribution
         script: |
-          xcode-project build-ipa \
+          set -o pipefail
+          if ! xcode-project build-ipa \
             --workspace "ios/$XCODE_WORKSPACE" \
-            --scheme "$XCODE_SCHEME"
+            --scheme "$XCODE_SCHEME"; then
+            echo "===== xcodebuild archive failed — last 200 log lines ====="
+            find /tmp/xcodebuild_logs -type f -name '*.log' 2>/dev/null | while read -r log; do
+              echo "--- $log ---"
+              tail -200 "$log"
+            done
+            exit 65
+          fi
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
