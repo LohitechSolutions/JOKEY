@@ -41,6 +41,8 @@ workflows:
       - name: Install CocoaPods dependencies
         script: |
           cd ios && pod install
+          echo "--- Native modules linked for iOS ---"
+          node --no-warnings --eval "require('expo/bin/autolinking')" expo-modules-autolinking react-native-config --json --platform ios --project-root .. | node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8')); console.log(Object.keys(d.dependencies||{}).sort().join('\n'))"
       - name: Set up code signing settings on Xcode project
         script: |
           xcode-project use-profiles --warn-only
