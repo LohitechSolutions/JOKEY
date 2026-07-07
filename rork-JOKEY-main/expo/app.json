@@ -12,13 +12,15 @@
       "android": {
         "exclude": [
           "expo-location",
-          "react-native-maps"
+          "react-native-maps",
+          "expo-notifications"
         ]
       },
       "ios": {
         "exclude": [
           "expo-location",
-          "react-native-maps"
+          "react-native-maps",
+          "expo-notifications"
         ]
       }
     },
