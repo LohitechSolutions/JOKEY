@@ -96,6 +96,7 @@
           "microphonePermission": "Jokey uses your microphone to record audio jokes and video sound. For example, when you tap Record, your voice is captured and published as a joke for the community."
         }
       ],
+      "expo-video",
       "./plugins/withEmbedDebugBundle.js",
       "./plugins/withAndroidUploadSigning.js",
       "./plugins/withRemoveForegroundServices.js",
