@@ -11,12 +11,14 @@
     "autolinking": {
       "android": {
         "exclude": [
-          "expo-location"
+          "expo-location",
+          "react-native-maps"
         ]
       },
       "ios": {
         "exclude": [
-          "expo-location"
+          "expo-location",
+          "react-native-maps"
         ]
       }
     },
@@ -104,7 +106,15 @@
       "expo-secure-store",
       "expo-localization",
       "expo-mail-composer",
-      "expo-tracking-transparency"
+      "expo-tracking-transparency",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "buildReactNativeFromSource": true
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
