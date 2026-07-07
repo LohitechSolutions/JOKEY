@@ -10,10 +10,14 @@
     "newArchEnabled": true,
     "autolinking": {
       "android": {
-        "exclude": ["expo-location"]
+        "exclude": [
+          "expo-location"
+        ]
       },
       "ios": {
-        "exclude": ["expo-location"]
+        "exclude": [
+          "expo-location"
+        ]
       }
     },
     "locales": {
@@ -31,7 +35,11 @@
       "bundleIdentifier": "app.rork.azbb4413e811lknfmyslw",
       "buildNumber": "14",
       "infoPlist": {
-        "CFBundleLocalizations": ["en", "fr", "ar"],
+        "CFBundleLocalizations": [
+          "en",
+          "fr",
+          "ar"
+        ],
         "CFBundleDevelopmentRegion": "en",
         "NSMicrophoneUsageDescription": "Jokey uses your microphone to record audio jokes and video sound. For example, when you tap Record, your voice is captured and published as a joke for the community.",
         "NSCameraUsageDescription": "Jokey uses your camera to record video jokes. For example, when you record a video joke, the footage is saved and shared on your Jokey profile for other users to watch.",
@@ -41,7 +49,9 @@
         "NSPrivacyAccessedAPITypes": [
           {
             "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
-            "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
+            "NSPrivacyAccessedAPITypeReasons": [
+              "CA92.1"
+            ]
           }
         ]
       }
@@ -88,7 +98,12 @@
       ],
       "./plugins/withEmbedDebugBundle.js",
       "./plugins/withAndroidUploadSigning.js",
-      "./plugins/withRemoveForegroundServices.js"
+      "./plugins/withRemoveForegroundServices.js",
+      "expo-sqlite",
+      "expo-secure-store",
+      "expo-localization",
+      "expo-mail-composer",
+      "expo-tracking-transparency"
     ],
     "experiments": {
       "typedRoutes": true
