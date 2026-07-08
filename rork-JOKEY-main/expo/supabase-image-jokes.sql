@@ -1,10 +1,8 @@
--- Run in Supabase SQL Editor to enable admin image jokes on the homepage.
--- Then grant admin to your account, e.g.:
+-- REQUIRED one-time setup for Admin → Publish (image jokes on the homepage).
+-- Supabase Dashboard → SQL Editor → New query → paste this file → Run.
+--
+-- Grants admin example:
 -- UPDATE public.users SET is_admin = true WHERE email = 'you@example.com';
-
-INSERT INTO storage.buckets (id, name, public)
-VALUES ('image-jokes', 'image-jokes', true)
-ON CONFLICT (id) DO UPDATE SET public = EXCLUDED.public;
 
 CREATE TABLE IF NOT EXISTS public.image_jokes (
   id TEXT PRIMARY KEY,
@@ -43,6 +41,11 @@ CREATE POLICY "Admins can delete image jokes"
     )
   );
 
+-- Legacy bucket used by older app builds.
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('image-jokes', 'image-jokes', true)
+ON CONFLICT (id) DO UPDATE SET public = EXCLUDED.public;
+
 DROP POLICY IF EXISTS "Image joke files are public" ON storage.objects;
 CREATE POLICY "Image joke files are public"
   ON storage.objects FOR SELECT
@@ -64,6 +67,36 @@ CREATE POLICY "Admins can delete image joke files"
   ON storage.objects FOR DELETE
   USING (
     bucket_id = 'image-jokes'
+    AND EXISTS (
+      SELECT 1 FROM public.users
+      WHERE id = auth.uid() AND is_admin = true
+    )
+  );
+
+-- Current app builds store drawings under the existing public `audio` bucket.
+DROP POLICY IF EXISTS "Audio bucket image joke files are public" ON storage.objects;
+CREATE POLICY "Audio bucket image joke files are public"
+  ON storage.objects FOR SELECT
+  USING (bucket_id = 'audio' AND name LIKE 'image-jokes/%');
+
+DROP POLICY IF EXISTS "Admins can upload audio bucket image jokes" ON storage.objects;
+CREATE POLICY "Admins can upload audio bucket image jokes"
+  ON storage.objects FOR INSERT
+  WITH CHECK (
+    bucket_id = 'audio'
+    AND name LIKE 'image-jokes/%'
+    AND EXISTS (
+      SELECT 1 FROM public.users
+      WHERE id = auth.uid() AND is_admin = true
+    )
+  );
+
+DROP POLICY IF EXISTS "Admins can delete audio bucket image joke files" ON storage.objects;
+CREATE POLICY "Admins can delete audio bucket image joke files"
+  ON storage.objects FOR DELETE
+  USING (
+    bucket_id = 'audio'
+    AND name LIKE 'image-jokes/%'
     AND EXISTS (
       SELECT 1 FROM public.users
       WHERE id = auth.uid() AND is_admin = true
