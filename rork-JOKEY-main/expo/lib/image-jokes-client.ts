@@ -1,8 +1,30 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase, isSupabaseConfigured } from './supabase';
 import { ImageJoke } from '@/types';
+import {
+  IMAGE_JOKE_STORAGE_BUCKET,
+  IMAGE_JOKE_STORAGE_PREFIX,
+} from '@/constants/app-config';
 
 const LOCAL_IMAGE_JOKES_KEY = 'joky_image_jokes';
+const IMAGE_JOKES_SETUP_HINT =
+  'Run rork-JOKEY-main/expo/supabase-image-jokes.sql in the Supabase SQL Editor (creates image_jokes table and storage policies).';
+
+function storagePathFromPublicUrl(imageUrl: string): string | null {
+  const bucketMarker = `/object/public/${IMAGE_JOKE_STORAGE_BUCKET}/`;
+  const bucketIdx = imageUrl.indexOf(bucketMarker);
+  if (bucketIdx >= 0) {
+    return imageUrl.slice(bucketIdx + bucketMarker.length);
+  }
+
+  const legacyMarker = '/object/public/image-jokes/';
+  const legacyIdx = imageUrl.indexOf(legacyMarker);
+  if (legacyIdx >= 0) {
+    return imageUrl.slice(legacyIdx + legacyMarker.length);
+  }
+
+  return null;
+}
 
 function mapRow(row: Record<string, unknown>): ImageJoke {
   return {
@@ -74,19 +96,26 @@ export async function uploadImageJokeToSupabase(
     contentType = 'image/webp';
   }
 
-  const filePath = `drawings/${jokeId}_${Date.now()}.${ext}`;
+  const filePath = `${IMAGE_JOKE_STORAGE_PREFIX}/${jokeId}_${Date.now()}.${ext}`;
 
-  const { error } = await supabase.storage.from('image-jokes').upload(filePath, arrayBuffer, {
+  const { error } = await supabase.storage.from(IMAGE_JOKE_STORAGE_BUCKET).upload(filePath, arrayBuffer, {
     contentType,
     upsert: true,
     duplex: 'half',
   });
 
   if (error) {
+    if (error.message.toLowerCase().includes('bucket not found')) {
+      throw new Error(
+        `Storage bucket "${IMAGE_JOKE_STORAGE_BUCKET}" is missing in Supabase. ${IMAGE_JOKES_SETUP_HINT}`
+      );
+    }
     throw new Error(error.message);
   }
 
-  const { data: publicUrlData } = supabase.storage.from('image-jokes').getPublicUrl(filePath);
+  const { data: publicUrlData } = supabase.storage
+    .from(IMAGE_JOKE_STORAGE_BUCKET)
+    .getPublicUrl(filePath);
   if (!publicUrlData.publicUrl) {
     throw new Error('Failed to generate public URL for image joke');
   }
@@ -124,6 +153,12 @@ export async function createImageJokeInDB(
   });
 
   if (error) {
+    if (
+      error.code === 'PGRST205' ||
+      error.message.toLowerCase().includes('image_jokes')
+    ) {
+      throw new Error(`Database table image_jokes is not set up. ${IMAGE_JOKES_SETUP_HINT}`);
+    }
     throw new Error(error.message);
   }
 
@@ -143,11 +178,15 @@ export async function deleteImageJokeFromDB(joke: ImageJoke): Promise<void> {
   }
 
   try {
-    const marker = '/image-jokes/';
-    const idx = joke.imageUrl.indexOf(marker);
-    if (idx >= 0) {
-      const storagePath = joke.imageUrl.slice(idx + marker.length);
-      await supabase.storage.from('image-jokes').remove([storagePath]);
+    const storagePath = storagePathFromPublicUrl(joke.imageUrl);
+    if (storagePath) {
+      await supabase.storage.from(IMAGE_JOKE_STORAGE_BUCKET).remove([storagePath]);
+      const legacyBucketPath = storagePath.startsWith('drawings/')
+        ? storagePath
+        : null;
+      if (legacyBucketPath) {
+        await supabase.storage.from('image-jokes').remove([legacyBucketPath]);
+      }
     }
   } catch (err) {
     console.warn('[ImageJokes] storage delete failed:', err);
