@@ -211,10 +211,17 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        <View style={styles.roleBadge}>
-          <Text style={styles.roleBadgeText}>
-            {currentUser.role === 'creator' ? t('profile.roleCreator') : t('profile.roleVisitor')}
-          </Text>
+        <View style={styles.roleBadgeRow}>
+          <View style={styles.roleBadge}>
+            <Text style={styles.roleBadgeText}>
+              {currentUser.role === 'creator' ? t('profile.roleCreator') : t('profile.roleVisitor')}
+            </Text>
+          </View>
+          {currentUser.isAdmin ? (
+            <View style={[styles.roleBadge, styles.adminBadge]}>
+              <Text style={[styles.roleBadgeText, styles.adminBadgeText]}>{t('settings.admin')}</Text>
+            </View>
+          ) : null}
         </View>
 
         {currentUser.bio ? (
@@ -498,12 +505,22 @@ const styles = StyleSheet.create({
     fontWeight: '500' as const,
   },
   roleBadge: {
-    alignSelf: 'flex-start' as const,
     backgroundColor: Colors.secondary,
     paddingHorizontal: 14,
     paddingVertical: 5,
     borderRadius: 16,
+  },
+  roleBadgeRow: {
+    flexDirection: 'row' as const,
+    flexWrap: 'wrap' as const,
+    gap: 8,
     marginBottom: 12,
+  },
+  adminBadge: {
+    backgroundColor: Colors.primary + '20',
+  },
+  adminBadgeText: {
+    color: Colors.primary,
   },
   roleBadgeText: {
     fontSize: 13,
