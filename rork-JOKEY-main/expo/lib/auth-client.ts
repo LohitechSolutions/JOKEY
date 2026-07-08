@@ -265,46 +265,48 @@ export async function clientLogin(input: {
   console.log('[AuthClient] Supabase login success:', data.user.id);
 
   let profile: any = null;
-  try {
-    const { data: profileData } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', data.user.id)
-      .single();
+  const { data: profileData, error: profileError } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', data.user.id)
+    .single();
+  if (profileError) {
+    console.warn('[AuthClient] Profile fetch failed (non-fatal):', profileError.message);
+  } else {
     profile = profileData;
-  } catch (err: any) {
-    console.warn('[AuthClient] Profile fetch failed (non-fatal):', err?.message);
   }
 
   const token = data.session?.access_token || 'supabase_' + data.user.id;
   const user = supabaseUserToAppUser(data.user, profile);
 
-  console.log('[AuthClient] Login success:', user.username);
+  console.log('[AuthClient] Login success:', user.username, 'isAdmin:', user.isAdmin === true);
   return { token, user };
 }
 
 export async function clientGetMe(uid: string): Promise<User | null> {
   console.log('[AuthClient] getMe for:', uid);
 
-  try {
-    const { data: profile } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', uid)
-      .single();
+  const { data: profile, error: profileError } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', uid)
+    .single();
 
-    if (profile) {
-      let authUser: any = { id: uid, created_at: '' };
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) authUser = user;
-      } catch {
-        console.log('[AuthClient] getUser failed, using fallback');
-      }
-      return supabaseUserToAppUser(authUser, profile);
+  if (!profileError && profile) {
+    let authUser: any = { id: uid, created_at: '' };
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) authUser = user;
+    } catch {
+      console.log('[AuthClient] getUser failed, using fallback');
     }
-  } catch (err) {
-    console.warn('[AuthClient] getMe error:', err);
+    const user = supabaseUserToAppUser(authUser, profile);
+    console.log('[AuthClient] getMe success:', user.username, 'isAdmin:', user.isAdmin === true);
+    return user;
+  }
+
+  if (profileError) {
+    console.warn('[AuthClient] getMe profile error:', profileError.message);
   }
 
   try {

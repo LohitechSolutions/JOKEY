@@ -127,6 +127,7 @@ function mapDbUserToUser(row: any): User {
     badges: row.badges || [],
     createdAt: row.created_at || '',
     isFollowing: false,
+    isAdmin: row.is_admin === true,
   };
 }
 
