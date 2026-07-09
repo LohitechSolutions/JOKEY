@@ -37,7 +37,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "app.rork.azbb4413e811lknfmyslw",
-      "buildNumber": "14",
+      "buildNumber": "15",
       "infoPlist": {
         "CFBundleLocalizations": [
           "en",
@@ -47,7 +47,8 @@
         "CFBundleDevelopmentRegion": "en",
         "NSMicrophoneUsageDescription": "Jokey uses your microphone to record audio jokes and video sound. For example, when you tap Record, your voice is captured and published as a joke for the community.",
         "NSCameraUsageDescription": "Jokey uses your camera to record video jokes. For example, when you record a video joke, the footage is saved and shared on your Jokey profile for other users to watch.",
-        "NSPhotoLibraryUsageDescription": "Jokey accesses your photo library so you can choose a profile picture. For example, the photo you select will be displayed on your public profile for other users to see."
+        "NSPhotoLibraryUsageDescription": "Jokey accesses your photo library so you can choose a profile picture. For example, the photo you select will be displayed on your public profile for other users to see.",
+        "NSUserTrackingUsageDescription": "Jokey uses this identifier to analyze app usage and improve your app experience."
       },
       "privacyManifests": {
         "NSPrivacyAccessedAPITypes": [
@@ -61,7 +62,7 @@
       }
     },
     "android": {
-      "versionCode": 14,
+      "versionCode": 15,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.jpeg",
         "backgroundColor": "#ffffff"
