@@ -102,8 +102,7 @@
       "expo-sqlite",
       "expo-secure-store",
       "expo-localization",
-      "expo-mail-composer",
-      "expo-tracking-transparency"
+      "expo-mail-composer"
     ],
     "experiments": {
       "typedRoutes": true
