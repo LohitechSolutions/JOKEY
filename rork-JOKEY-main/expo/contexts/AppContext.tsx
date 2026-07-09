@@ -327,15 +327,20 @@ export const [AppProvider, useApp] = createContextHook(() => {
           supabase.from('users').select('is_admin').eq('id', currentUser.id).single(),
         ]);
         if (cancelled) return;
-        setCurrentUser((prev) =>
-          prev
-            ? {
-                ...prev,
-                ...stats,
-                isAdmin: adminResult.data?.is_admin === true,
-              }
-            : prev
-        );
+        if (adminResult.error) {
+          console.warn('[AppContext] Admin status fetch failed:', adminResult.error.message);
+        }
+        const isAdmin = adminResult.data?.is_admin === true;
+        setCurrentUser((prev) => {
+          if (!prev) return prev;
+          const next = {
+            ...prev,
+            ...stats,
+            isAdmin,
+          };
+          void setCachedUser(next);
+          return next;
+        });
         setFollowingIds(following);
       } catch (err) {
         console.warn('[AppContext] Profile stats sync failed:', err);
@@ -388,19 +393,21 @@ export const [AppProvider, useApp] = createContextHook(() => {
           filter: `id=eq.${currentUser.id}`,
         },
         (payload) => {
-          const row = payload.new as Record<string, number | string | null>;
-          setCurrentUser((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  jokesCount: typeof row.jokes_count === 'number' ? row.jokes_count : prev.jokesCount,
-                  followersCount:
-                    typeof row.followers_count === 'number' ? row.followers_count : prev.followersCount,
-                  followingCount:
-                    typeof row.following_count === 'number' ? row.following_count : prev.followingCount,
-                }
-              : prev
-          );
+          const row = payload.new as Record<string, number | string | boolean | null>;
+          setCurrentUser((prev) => {
+            if (!prev) return prev;
+            const next = {
+              ...prev,
+              jokesCount: typeof row.jokes_count === 'number' ? row.jokes_count : prev.jokesCount,
+              followersCount:
+                typeof row.followers_count === 'number' ? row.followers_count : prev.followersCount,
+              followingCount:
+                typeof row.following_count === 'number' ? row.following_count : prev.followingCount,
+              isAdmin: typeof row.is_admin === 'boolean' ? row.is_admin : prev.isAdmin,
+            };
+            void setCachedUser(next);
+            return next;
+          });
         }
       )
       .subscribe();
@@ -563,6 +570,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
         role: data.user.role || 'visitor',
         badges: data.user.badges || [],
         isFollowing: data.user.isFollowing ?? false,
+        isAdmin: data.user.isAdmin === true,
       };
       await setCachedUser(user);
       setCurrentUser(user);

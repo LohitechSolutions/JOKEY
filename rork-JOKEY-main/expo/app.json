@@ -11,12 +11,16 @@
     "autolinking": {
       "android": {
         "exclude": [
-          "expo-location"
+          "expo-location",
+          "react-native-maps",
+          "expo-notifications"
         ]
       },
       "ios": {
         "exclude": [
-          "expo-location"
+          "expo-location",
+          "react-native-maps",
+          "expo-notifications"
         ]
       }
     },
@@ -97,13 +101,24 @@
           "microphonePermission": "Jokey uses your microphone to record audio jokes and video sound. For example, when you tap Record, your voice is captured and published as a joke for the community."
         }
       ],
+      "expo-video",
       "./plugins/withEmbedDebugBundle.js",
       "./plugins/withAndroidUploadSigning.js",
       "./plugins/withRemoveForegroundServices.js",
       "expo-sqlite",
       "expo-secure-store",
       "expo-localization",
-      "expo-mail-composer"
+      "expo-mail-composer",
+      "expo-tracking-transparency",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "buildReactNativeFromSource": true
+          }
+        }
+      ],
+      "./plugins/withFmtXcode26Fix.js"
     ],
     "experiments": {
       "typedRoutes": true
