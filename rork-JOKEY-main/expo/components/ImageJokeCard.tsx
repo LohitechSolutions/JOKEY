@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Image } from 'react-native';
 import Colors from '@/constants/colors';
 import { ImageJoke } from '@/types';
@@ -8,13 +8,35 @@ interface ImageJokeCardProps {
 }
 
 export default React.memo(function ImageJokeCard({ joke }: ImageJokeCardProps) {
+  const [aspectRatio, setAspectRatio] = useState<number>(0.87);
+
+  useEffect(() => {
+    let mounted = true;
+    if (joke.imageUrl) {
+      Image.getSize(
+        joke.imageUrl,
+        (width, height) => {
+          if (mounted && width > 0 && height > 0) {
+            setAspectRatio(width / height);
+          }
+        },
+        () => {
+          // Keep fallback ratio on error
+        }
+      );
+    }
+    return () => {
+      mounted = false;
+    };
+  }, [joke.imageUrl]);
+
   return (
     <View style={styles.card}>
       <Text style={styles.title}>{joke.title}</Text>
       <Image
         source={{ uri: joke.imageUrl }}
-        style={styles.image}
-        resizeMode="cover"
+        style={[styles.image, { aspectRatio }]}
+        resizeMode="contain"
         accessibilityLabel={joke.title}
       />
     </View>
@@ -41,7 +63,6 @@ const styles = StyleSheet.create({
   },
   image: {
     width: '100%',
-    aspectRatio: 0.87,
     backgroundColor: Colors.surfaceLight,
   },
 });
