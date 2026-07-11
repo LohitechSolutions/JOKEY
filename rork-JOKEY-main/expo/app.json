@@ -37,7 +37,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "app.rork.azbb4413e811lknfmyslw",
-      "buildNumber": "15",
+      "buildNumber": "25",
       "infoPlist": {
         "CFBundleLocalizations": [
           "en",
@@ -61,7 +61,7 @@
       }
     },
     "android": {
-      "versionCode": 15,
+      "versionCode": 25,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.jpeg",
         "backgroundColor": "#ffffff"
@@ -71,7 +71,10 @@
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
-        "android.permission.FOREGROUND_SERVICE_MICROPHONE"
+        "android.permission.FOREGROUND_SERVICE_MICROPHONE",
+        "android.permission.ACTIVITY_RECOGNITION",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO"
       ]
     },
     "web": {
