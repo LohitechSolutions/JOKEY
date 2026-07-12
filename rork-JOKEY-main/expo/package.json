@@ -1,7 +1,7 @@
 {
   "name": "jokey",
   "main": "expo-router/entry",
-  "version": "1.14",
+  "version": "1.15",
   "scripts": {
     "start": "bunx rork start -p azbb4413e811lknfmyslw --tunnel",
     "start-web": "bunx rork start -p azbb4413e811lknfmyslw --web --tunnel",
