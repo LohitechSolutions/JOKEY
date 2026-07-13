@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Image } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, Image, ImageLoadEventData, NativeSyntheticEvent } from 'react-native';
 import Colors from '@/constants/colors';
 import { ImageJoke } from '@/types';
 
@@ -8,35 +8,23 @@ interface ImageJokeCardProps {
 }
 
 export default React.memo(function ImageJokeCard({ joke }: ImageJokeCardProps) {
-  const [aspectRatio, setAspectRatio] = useState<number>(0.87);
+  const [aspectRatio, setAspectRatio] = useState<number | null>(null);
 
-  useEffect(() => {
-    let mounted = true;
-    if (joke.imageUrl) {
-      Image.getSize(
-        joke.imageUrl,
-        (width, height) => {
-          if (mounted && width > 0 && height > 0) {
-            setAspectRatio(width / height);
-          }
-        },
-        () => {
-          // Keep fallback ratio on error
-        }
-      );
+  const handleLoad = (event: NativeSyntheticEvent<ImageLoadEventData>) => {
+    const { width, height } = event.nativeEvent.source;
+    if (width > 0 && height > 0) {
+      setAspectRatio(width / height);
     }
-    return () => {
-      mounted = false;
-    };
-  }, [joke.imageUrl]);
+  };
 
   return (
     <View style={styles.card}>
       <Text style={styles.title}>{joke.title}</Text>
       <Image
         source={{ uri: joke.imageUrl }}
-        style={[styles.image, { aspectRatio }]}
+        style={[styles.image, aspectRatio != null ? { aspectRatio } : styles.imagePlaceholder]}
         resizeMode="contain"
+        onLoad={handleLoad}
         accessibilityLabel={joke.title}
       />
     </View>
@@ -64,5 +52,8 @@ const styles = StyleSheet.create({
   image: {
     width: '100%',
     backgroundColor: Colors.surfaceLight,
+  },
+  imagePlaceholder: {
+    minHeight: 180,
   },
 });

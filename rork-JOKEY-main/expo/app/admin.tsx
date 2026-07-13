@@ -9,6 +9,8 @@ import {
   Alert,
   Image,
   ActivityIndicator,
+  ImageLoadEventData,
+  NativeSyntheticEvent,
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { ArrowLeft, Shield, Trash2, ImagePlus } from 'lucide-react-native';
@@ -33,6 +35,7 @@ export default function AdminScreen() {
   const { t } = useLanguage();
   const [title, setTitle] = useState('');
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
+  const [previewAspectRatio, setPreviewAspectRatio] = useState<number | null>(null);
 
   const isAdmin = currentUser?.isAdmin === true;
 
@@ -50,9 +53,22 @@ export default function AdminScreen() {
     });
 
     if (!result.canceled && result.assets[0]?.uri) {
-      setSelectedImageUri(result.assets[0].uri);
+      const asset = result.assets[0];
+      setSelectedImageUri(asset.uri);
+      if (asset.width > 0 && asset.height > 0) {
+        setPreviewAspectRatio(asset.width / asset.height);
+      } else {
+        setPreviewAspectRatio(null);
+      }
     }
   }, [t]);
+
+  const handlePreviewLoad = useCallback((event: NativeSyntheticEvent<ImageLoadEventData>) => {
+    const { width, height } = event.nativeEvent.source;
+    if (width > 0 && height > 0) {
+      setPreviewAspectRatio(width / height);
+    }
+  }, []);
 
   const handlePublish = useCallback(async () => {
     if (!title.trim()) {
@@ -70,6 +86,7 @@ export default function AdminScreen() {
       Alert.alert(t('admin.publishedTitle'), t('admin.publishedMsg'));
       setTitle('');
       setSelectedImageUri(null);
+      setPreviewAspectRatio(null);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : t('admin.publishFailed');
       Alert.alert(t('auth.error'), message);
@@ -164,7 +181,15 @@ export default function AdminScreen() {
         </TouchableOpacity>
 
         {selectedImageUri ? (
-          <Image source={{ uri: selectedImageUri }} style={styles.preview} resizeMode="cover" />
+          <Image
+            source={{ uri: selectedImageUri }}
+            style={[
+              styles.preview,
+              previewAspectRatio != null ? { aspectRatio: previewAspectRatio } : styles.previewPlaceholder,
+            ]}
+            resizeMode="contain"
+            onLoad={handlePreviewLoad}
+          />
         ) : null}
 
         <TouchableOpacity
@@ -187,7 +212,7 @@ export default function AdminScreen() {
         ) : (
           imageJokes.map((joke) => (
             <View key={joke.id} style={styles.listItem}>
-              <Image source={{ uri: joke.imageUrl }} style={styles.thumbnail} />
+              <Image source={{ uri: joke.imageUrl }} style={styles.thumbnail} resizeMode="contain" />
               <View style={styles.listText}>
                 <Text style={styles.listTitle} numberOfLines={2}>{joke.title}</Text>
               </View>
@@ -288,10 +313,12 @@ const styles = StyleSheet.create({
   },
   preview: {
     width: '100%',
-    height: 260,
     borderRadius: 14,
     marginBottom: 14,
     backgroundColor: Colors.surfaceLight,
+  },
+  previewPlaceholder: {
+    minHeight: 180,
   },
   primaryBtn: {
     backgroundColor: Colors.primary,
