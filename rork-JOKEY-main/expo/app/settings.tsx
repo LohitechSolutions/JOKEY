@@ -28,6 +28,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { APP_VERSION, PRIVACY_POLICY_URL } from '@/constants/app-config';
 import { LANGUAGE_OPTIONS } from '@/constants/translations';
 import { showUnblockConfirm } from '@/lib/moderation-client';
+import { syncPushNotificationPreference } from '@/lib/push-notifications';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -40,11 +41,32 @@ export default function SettingsScreen() {
   // App is fully free - no subscription needed
   const { t, language, changeLanguage } = useLanguage();
   const [showLangPicker, setShowLangPicker] = React.useState(false);
+  const [isUpdatingNotifications, setIsUpdatingNotifications] = React.useState(false);
 
+  const handleToggleNotifications = async (val: boolean) => {
+    if (!currentUser) {
+      Alert.alert(t('settings.notifications'), t('settings.notificationsLoginRequired'));
+      return;
+    }
 
+    setIsUpdatingNotifications(true);
+    try {
+      const result = await syncPushNotificationPreference(currentUser.id, val);
 
-  const handleToggleNotifications = (val: boolean) => {
-    updateSettings({ ...settings, notifications: val });
+      if (!result.ok) {
+        Alert.alert(
+          t('settings.notifications'),
+          result.permissionDenied
+            ? t('settings.notificationsPermissionDenied')
+            : t('settings.notificationsEnableError')
+        );
+        return;
+      }
+
+      updateSettings({ ...settings, notifications: val });
+    } finally {
+      setIsUpdatingNotifications(false);
+    }
   };
 
   const handleToggleSafeMode = (val: boolean) => {
@@ -124,6 +146,7 @@ export default function SettingsScreen() {
           <Switch
             value={settings.notifications}
             onValueChange={handleToggleNotifications}
+            disabled={isUpdatingNotifications}
             trackColor={{ false: Colors.cardBorder, true: Colors.primary + '60' }}
             thumbColor={settings.notifications ? Colors.primary : Colors.textMuted}
           />

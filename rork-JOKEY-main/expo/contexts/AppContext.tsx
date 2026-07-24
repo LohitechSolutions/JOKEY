@@ -27,6 +27,7 @@ import {
   deleteImageJokeFromDB,
 } from '@/lib/image-jokes-client';
 import { isSupabaseConfigured } from '@/lib/supabase';
+import { unregisterPushNotifications } from '@/lib/push-notifications';
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 
 const PASSWORD_RECOVERY_USER = { __passwordRecovery: true } as const;
@@ -699,6 +700,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const deleteMutation = useMutation({
     mutationFn: async () => {
       if (currentUser) {
+        await unregisterPushNotifications(currentUser.id);
         await clientDeleteAccount(currentUser.id);
       }
       await signOutSupabase();
@@ -723,6 +725,9 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const logoutMutation = useMutation({
     mutationFn: async () => {
       console.log('[AppContext] Logout mutation started');
+      if (currentUser) {
+        await unregisterPushNotifications(currentUser.id);
+      }
       await signOutSupabase();
       console.log('[AppContext] signOutSupabase completed');
     },

@@ -8,6 +8,7 @@ import { setAudioModeAsync } from "expo-audio";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AppProvider, useApp } from "@/contexts/AppContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import PushNotificationManager from "@/components/PushNotificationManager";
 import Colors from "@/constants/colors";
 
 void SplashScreen.preventAutoHideAsync();
@@ -56,29 +57,32 @@ function RootLayoutNav() {
   }
 
   return (
-    <Stack
-      screenOptions={{
-        headerBackTitle: "Retour",
-        headerStyle: { backgroundColor: Colors.background },
-        headerTintColor: Colors.text,
-        contentStyle: { backgroundColor: Colors.background },
-      }}
-    >
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="preamble" options={{ headerShown: false }} />
-      <Stack.Screen name="auth" options={{ headerShown: false, presentation: 'modal' }} />
-      <Stack.Screen name="joke/[id]" options={{ title: 'Blague' }} />
-      <Stack.Screen name="user/[id]" options={{ title: 'Profil' }} />
-      <Stack.Screen name="settings" options={{ title: 'Paramètres' }} />
+    <>
+      <PushNotificationManager />
+      <Stack
+        screenOptions={{
+          headerBackTitle: "Retour",
+          headerStyle: { backgroundColor: Colors.background },
+          headerTintColor: Colors.text,
+          contentStyle: { backgroundColor: Colors.background },
+        }}
+      >
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="preamble" options={{ headerShown: false }} />
+        <Stack.Screen name="auth" options={{ headerShown: false, presentation: 'modal' }} />
+        <Stack.Screen name="joke/[id]" options={{ title: 'Blague' }} />
+        <Stack.Screen name="user/[id]" options={{ title: 'Profil' }} />
+        <Stack.Screen name="settings" options={{ title: 'Paramètres' }} />
 
-      <Stack.Screen name="admin" options={{ title: 'Administration' }} />
-      <Stack.Screen name="change-password" options={{ title: 'Modifier le mot de passe' }} />
-      <Stack.Screen name="delete-account" options={{ title: 'Supprimer le compte' }} />
-      <Stack.Screen name="privacy" options={{ title: 'Confidentialité' }} />
-      <Stack.Screen name="terms" options={{ title: "Conditions d'utilisation" }} />
-      <Stack.Screen name="subscription" options={{ title: 'Abonnement' }} />
-      <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-    </Stack>
+        <Stack.Screen name="admin" options={{ title: 'Administration' }} />
+        <Stack.Screen name="change-password" options={{ title: 'Modifier le mot de passe' }} />
+        <Stack.Screen name="delete-account" options={{ title: 'Supprimer le compte' }} />
+        <Stack.Screen name="privacy" options={{ title: 'Confidentialité' }} />
+        <Stack.Screen name="terms" options={{ title: "Conditions d'utilisation" }} />
+        <Stack.Screen name="subscription" options={{ title: 'Abonnement' }} />
+        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+      </Stack>
+    </>
   );
 }
 
@@ -94,9 +98,7 @@ const loadingStyles = StyleSheet.create({
 export default function RootLayout() {
   useEffect(() => {
     void SplashScreen.hideAsync();
-    
-    // Ensure Android (and iOS) routes audio through the main speaker, not the earpiece,
-    // and properly plays media even if the hardware switch is on silent.
+
     void setAudioModeAsync({
       playsInSilentMode: true,
       allowsRecording: false,

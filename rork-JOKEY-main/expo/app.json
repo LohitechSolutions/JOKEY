@@ -12,15 +12,13 @@
       "android": {
         "exclude": [
           "expo-location",
-          "react-native-maps",
-          "expo-notifications"
+          "react-native-maps"
         ]
       },
       "ios": {
         "exclude": [
           "expo-location",
-          "react-native-maps",
-          "expo-notifications"
+          "react-native-maps"
         ]
       }
     },
@@ -119,10 +117,24 @@
           }
         }
       ],
-      "./plugins/withFmtXcode26Fix.js"
+      "./plugins/withFmtXcode26Fix.js",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.jpeg",
+          "color": "#FF231F7C",
+          "defaultChannel": "default"
+        }
+      ]
     ],
+    "extra": {
+      "eas": {
+        "projectId": "REPLACE_WITH_EAS_PROJECT_ID"
+      }
+    },
     "experiments": {
-      "typedRoutes": true
+      "typedRoutes": true,
+      "tsconfigPaths": true
     }
   }
 }
