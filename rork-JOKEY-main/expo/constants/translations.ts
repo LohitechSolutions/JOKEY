@@ -387,27 +387,17 @@ const translations: Record<Language, Record<string, string>> = {
 
     // Profile role
     'profile.roleCreator': 'Créateur',
-    'profile.roleVisitor': 'Visiteur',
     'profile.tipsReceived': 'Pourboires reçus',
     'profile.notLoggedIn': 'Non connecté',
     'profile.loginToAccess': 'Connectez-vous pour accéder à votre profil',
 
     // Limits
-    'sub.visitorLimit': 'Vous avez écouté {n}/8 blagues gratuites',
     'sub.creatorLimit': 'Vous avez créé {n}/5 blagues gratuites',
     'sub.limitReached': 'Limite atteinte',
-    'sub.visitorLimitMsg': 'Vous avez atteint la limite de 8 écoutes gratuites. Abonnez-vous pour un accès illimité !',
     'sub.creatorLimitMsg': 'Vous avez atteint la limite de 5 créations gratuites. Abonnez-vous pour créer sans limites !',
     'sub.upgradeNow': "S'abonner maintenant",
     'sub.weeklyPrice': '7,99€/semaine',
     'sub.monthlyPrice': '19,99€/mois',
-    'auth.roleCreator': 'Créateur',
-    'auth.roleVisitor': 'Visiteur',
-    'auth.roleCreatorDesc': 'Enregistrez et partagez vos blagues',
-    'auth.roleVisitorDesc': 'Écoutez les meilleures blagues',
-    'auth.chooseRole': 'Choix de rôles',
-    'auth.selectRole': 'Veuillez choisir un rôle',
-    'auth.selectRoleMsg': 'Sélectionnez Créateur ou Visiteur pour continuer.',
 
     // Password change
     'settings.changePassword': 'Modifier le mot de passe',
@@ -824,15 +814,6 @@ const translations: Record<Language, Record<string, string>> = {
     'admin.accessDenied': 'Access denied',
     'admin.accessDeniedMsg': 'Only admin accounts can manage drawing jokes. Contact the Jokey team.',
 
-    // Role
-    'auth.chooseRole': 'Choose a role',
-    'auth.roleCreator': 'Creator',
-    'auth.roleVisitor': 'Visitor',
-    'auth.roleCreatorDesc': 'Record and share your jokes',
-    'auth.roleVisitorDesc': 'Listen to the best jokes',
-    'auth.selectRole': 'Please choose a role',
-    'auth.selectRoleMsg': 'Select Creator or Visitor to continue.',
-
     // Tips
     'tip.title': 'Send a tip',
     'tip.send': 'Send',
@@ -845,15 +826,12 @@ const translations: Record<Language, Record<string, string>> = {
 
     // Profile role
     'profile.role': 'Profile',
-    'profile.roleCreator': '\uD83C\uDF99\uFE0F Creator',
-    'profile.roleVisitor': '\uD83C\uDFA7 Visitor',
+    'profile.roleCreator': 'Creator',
     'profile.tipsReceived': 'Tips received',
 
     // Limits
-    'sub.visitorLimit': "You've listened to {n}/8 free jokes",
     'sub.creatorLimit': "You've created {n}/5 free jokes",
     'sub.limitReached': 'Limit reached',
-    'sub.visitorLimitMsg': "You've reached the 8 free listens limit. Subscribe for unlimited access!",
     'sub.creatorLimitMsg': "You've reached the 5 free creations limit. Subscribe to create without limits!",
     'sub.upgradeNow': 'Subscribe now',
     'sub.weekly': 'Weekly',
@@ -1456,14 +1434,7 @@ const translations: Record<Language, Record<string, string>> = {
     'auth.mustBe18': 'يجب أن يكون عمرك 18 عاماً على الأقل لاستخدام Jokey.',
     'auth.loginTermsNotice': 'بتسجيل الدخول، فإنك توافق على',
 
-    // Role
-    'auth.chooseRole': 'اختيار الدور',
-    'auth.roleCreator': 'صانع محتوى',
-    'auth.roleVisitor': 'زائر',
-    'auth.roleCreatorDesc': 'سجّل وشارك نكتك',
-    'auth.roleVisitorDesc': 'استمع لأفضل النكت',
-    'auth.selectRole': 'يرجى اختيار دور',
-    'auth.selectRoleMsg': 'اختر صانع محتوى أو زائر للمتابعة.',
+    'profile.roleCreator': 'صانع محتوى',
 
     'privacy.title': 'سياسة الخصوصية',
     'privacy.lastUpdated': 'آخر تحديث',

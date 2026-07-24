@@ -713,6 +713,11 @@ export const [AppProvider, useApp] = createContextHook(() => {
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
+      try {
+        await removeCurrentPushDevice();
+      } catch (err) {
+        console.warn('[AppContext] push device cleanup on delete failed:', err);
+      }
       if (currentUser) {
         await clientDeleteAccount(currentUser.id);
       }
