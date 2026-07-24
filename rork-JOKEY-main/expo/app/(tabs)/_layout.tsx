@@ -2,13 +2,10 @@ import { Tabs } from 'expo-router';
 import { Home, Mic, Search, Trophy, Grid3X3, User, Video } from 'lucide-react-native';
 import React from 'react';
 import Colors from '@/constants/colors';
-import { useApp } from '@/contexts/AppContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function TabLayout() {
-  const { currentUser } = useApp();
   const { t } = useLanguage();
-  const isCreator = currentUser?.role === 'creator';
 
   return (
     <Tabs
@@ -53,7 +50,6 @@ export default function TabLayout() {
         options={{
           title: t('tab.record'),
           tabBarIcon: ({ color, size }) => <Mic size={size} color={color} />,
-          href: isCreator ? '/record' : null,
         }}
       />
       <Tabs.Screen

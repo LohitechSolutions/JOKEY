@@ -1,14 +1,7 @@
-import { Redirect, Stack } from 'expo-router';
+import { Stack } from 'expo-router';
 import Colors from '@/constants/colors';
-import { useApp } from '@/contexts/AppContext';
 
 export default function RecordLayout() {
-  const { currentUser } = useApp();
-
-  if (currentUser?.role !== 'creator') {
-    return <Redirect href="/" />;
-  }
-
   return (
     <Stack
       screenOptions={{

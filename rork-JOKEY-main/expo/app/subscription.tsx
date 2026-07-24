@@ -17,7 +17,7 @@ import type { SubscriptionPlan } from '@/types';
 
 export default function SubscriptionScreen() {
   const router = useRouter();
-  const { isSubscribed, subscribe, currentUser, listenCount, createCount } = useApp();
+  const { isSubscribed, subscribe, createCount } = useApp();
   const { t } = useLanguage();
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan>('weekly');
 
@@ -58,10 +58,7 @@ export default function SubscriptionScreen() {
     );
   };
 
-  const isCreator = currentUser?.role === 'creator';
-  const usageText = isCreator
-    ? t('sub.creatorLimit').replace('{n}', createCount.toString())
-    : t('sub.visitorLimit').replace('{n}', listenCount.toString());
+  const usageText = t('sub.creatorLimit').replace('{n}', createCount.toString());
 
   const features = [
     { icon: <InfinityIcon size={22} color="#1565C0" />, title: t('sub.unlimited'), desc: t('sub.unlimitedDesc') },
@@ -106,7 +103,7 @@ export default function SubscriptionScreen() {
               style={[
                 styles.usageFill,
                 {
-                  width: `${Math.min(((isCreator ? createCount : listenCount) / (isCreator ? 5 : 8)) * 100, 100)}%`,
+                  width: `${Math.min((createCount / 5) * 100, 100)}%`,
                 },
               ]}
             />

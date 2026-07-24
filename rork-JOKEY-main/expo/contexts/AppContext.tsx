@@ -567,7 +567,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
       console.log('[AppContext] Auth success:', data.user.username || data.user.id);
       const user: User = {
         ...data.user,
-        role: data.user.role || 'visitor',
+        role: data.user.role || 'creator',
         badges: data.user.badges || [],
         isFollowing: data.user.isFollowing ?? false,
         isAdmin: data.user.isAdmin === true,
@@ -1076,8 +1076,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
   }, []);
 
   const canCreate = useCallback(() => {
-    if (currentUser?.role !== 'creator') return false;
-    return true;
+    return !!currentUser;
   }, [currentUser]);
 
   const getTipsForUser = useCallback((userId: string) => {

@@ -74,6 +74,8 @@ export default function PreambleScreen() {
           <Link href="/privacy" style={styles.link}>{t('preamble.privacyLink')}</Link>
         </View>
 
+        <Text style={styles.adultWarning}>{t('preamble.adultWarning')}</Text>
+
         <TouchableOpacity
           style={styles.checkboxRow}
           onPress={() => setAgeConfirmed(!ageConfirmed)}
@@ -183,6 +185,12 @@ const styles = StyleSheet.create({
   },
   linkSep: {
     color: Colors.textMuted,
+  },
+  adultWarning: {
+    fontSize: 14,
+    color: Colors.warning,
+    lineHeight: 20,
+    marginBottom: 14,
   },
   checkboxRow: {
     flexDirection: 'row',

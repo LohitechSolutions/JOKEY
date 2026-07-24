@@ -1,3 +1,4 @@
+/** 'visitor' kept for legacy accounts; new signups are always 'creator'. */
 export type UserRole = 'creator' | 'visitor';
 
 export interface User {

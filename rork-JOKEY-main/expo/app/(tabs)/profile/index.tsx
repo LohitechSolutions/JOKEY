@@ -214,7 +214,7 @@ export default function ProfileScreen() {
         <View style={styles.roleBadgeRow}>
           <View style={styles.roleBadge}>
             <Text style={styles.roleBadgeText}>
-              {currentUser.role === 'creator' ? t('profile.roleCreator') : t('profile.roleVisitor')}
+              {t('profile.roleCreator')}
             </Text>
           </View>
           {currentUser.isAdmin ? (

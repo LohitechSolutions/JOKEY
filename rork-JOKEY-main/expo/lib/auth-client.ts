@@ -83,7 +83,7 @@ export async function clientRegister(input: {
       username: input.username,
       email: normalizedEmail,
       password: input.password,
-      role: input.role || 'visitor',
+      role: 'creator',
       createdAt: now,
     };
     localUsers.push(record);
@@ -96,7 +96,7 @@ export async function clientRegister(input: {
       avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(input.username)}&background=1565C0&color=fff&size=150`,
       bio: '',
       language: input.language || 'FR',
-      role: (input.role as 'creator' | 'visitor') || 'visitor',
+      role: 'creator',
       jokesCount: 0,
       totalLikes: 0,
       followersCount: 0,
@@ -134,7 +134,7 @@ export async function clientRegister(input: {
     options: {
       data: {
         username: input.username,
-        role: input.role || 'visitor',
+        role: 'creator',
       },
     },
   });
@@ -162,7 +162,7 @@ export async function clientRegister(input: {
       avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(input.username)}&background=1565C0&color=fff&size=150`,
       bio: '',
       language: input.language || 'FR',
-      role: input.role || 'visitor',
+      role: 'creator',
       jokes_count: 0,
       total_likes: 0,
       followers_count: 0,
@@ -188,7 +188,7 @@ export async function clientRegister(input: {
     avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(input.username)}&background=1565C0&color=fff&size=150`,
     bio: '',
     language: input.language || 'FR',
-    role: (input.role as 'creator' | 'visitor') || 'visitor',
+    role: 'creator',
     jokesCount: 0,
     totalLikes: 0,
     followersCount: 0,

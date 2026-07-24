@@ -119,7 +119,7 @@ function mapDbUserToUser(row: any): User {
     avatar: row.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(row.username || 'U')}&background=1565C0&color=fff&size=150`,
     bio: row.bio || '',
     language: row.language || 'FR',
-    role: row.role || 'visitor',
+    role: row.role || 'creator',
     jokesCount: row.jokes_count || 0,
     totalLikes: row.total_likes || 0,
     followersCount: row.followers_count || 0,

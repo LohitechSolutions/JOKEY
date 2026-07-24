@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 
 import { Stack, useRouter, Link } from 'expo-router';
-import { Mail, Lock, User, Eye, EyeOff, ArrowLeft, Mic, Headphones } from 'lucide-react-native';
+import { Mail, Lock, User, Eye, EyeOff, ArrowLeft } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useApp } from '@/contexts/AppContext';
@@ -32,7 +32,6 @@ export default function AuthScreen() {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [selectedRole, setSelectedRole] = useState<'creator' | 'visitor' | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [confirmedAge, setConfirmedAge] = useState(false);
@@ -101,19 +100,15 @@ export default function AuthScreen() {
         Alert.alert(t('auth.passwordTooShort'), t('auth.passwordMin'));
         return;
       }
-      if (!selectedRole) {
-        Alert.alert(t('auth.selectRole'), t('auth.selectRoleMsg'));
-        return;
-      }
       if (!confirmedAge) {
-        Alert.alert(t('auth.fieldsRequired'), t('auth.mustBe13'));
+        Alert.alert(t('auth.fieldsRequired'), t('auth.mustBe18'));
         return;
       }
       if (!acceptedTerms) {
         Alert.alert(t('auth.fieldsRequired'), t('auth.mustAcceptTerms'));
         return;
       }
-      register({ username: username.trim(), email: email.trim(), password, role: selectedRole });
+      register({ username: username.trim(), email: email.trim(), password, role: 'creator' });
     } else if (mode === 'login') {
       if (!email.trim() || !password.trim()) {
         Alert.alert(t('auth.fieldsRequired'), t('auth.fillLogin'));
@@ -362,59 +357,21 @@ export default function AuthScreen() {
               </Text>
 
               {mode === 'register' && (
-                <>
-                  <View style={styles.inputGroup}>
-                    <View style={styles.inputIcon}>
-                      <User size={20} color={Colors.primary} />
-                    </View>
-                    <TextInput
-                      style={styles.input}
-                      placeholder={t('auth.username')}
-                      placeholderTextColor={Colors.textMuted}
-                      value={username}
-                      onChangeText={setUsername}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      testID="input-username"
-                    />
+                <View style={styles.inputGroup}>
+                  <View style={styles.inputIcon}>
+                    <User size={20} color={Colors.primary} />
                   </View>
-
-                  <Text style={styles.roleLabel}>{t('auth.chooseRole')}</Text>
-                  <View style={styles.roleRow}>
-                    <TouchableOpacity
-                      style={[styles.roleCard, selectedRole === 'creator' && styles.roleCardActive]}
-                      onPress={() => {
-                        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        setSelectedRole('creator');
-                      }}
-                      testID="role-creator"
-                    >
-                      <View style={[styles.roleIconBox, selectedRole === 'creator' && styles.roleIconBoxActive]}>
-                        <Mic size={24} color={selectedRole === 'creator' ? Colors.white : Colors.accent} />
-                      </View>
-                      <Text style={[styles.roleTitle, selectedRole === 'creator' && styles.roleTitleActive]}>
-                        {t('auth.roleCreator')}
-                      </Text>
-                      <Text style={styles.roleDesc}>{t('auth.roleCreatorDesc')}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.roleCard, selectedRole === 'visitor' && styles.roleCardActive]}
-                      onPress={() => {
-                        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        setSelectedRole('visitor');
-                      }}
-                      testID="role-visitor"
-                    >
-                      <View style={[styles.roleIconBox, selectedRole === 'visitor' && styles.roleIconBoxActive]}>
-                        <Headphones size={24} color={selectedRole === 'visitor' ? Colors.white : Colors.primary} />
-                      </View>
-                      <Text style={[styles.roleTitle, selectedRole === 'visitor' && styles.roleTitleActive]}>
-                        {t('auth.roleVisitor')}
-                      </Text>
-                      <Text style={styles.roleDesc}>{t('auth.roleVisitorDesc')}</Text>
-                    </TouchableOpacity>
-                  </View>
-                </>
+                  <TextInput
+                    style={styles.input}
+                    placeholder={t('auth.username')}
+                    placeholderTextColor={Colors.textMuted}
+                    value={username}
+                    onChangeText={setUsername}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    testID="input-username"
+                  />
+                </View>
               )}
 
               <View style={styles.inputGroup}>
@@ -482,6 +439,7 @@ export default function AuthScreen() {
 
               {mode === 'register' && (
                 <View style={styles.legalSection}>
+                  <Text style={styles.adultWarning}>{t('auth.adultWarning')}</Text>
                   <TouchableOpacity
                     style={styles.checkboxRow}
                     onPress={() => setConfirmedAge(!confirmedAge)}
@@ -721,60 +679,6 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     fontWeight: '800' as const,
   },
-  roleLabel: {
-    fontSize: 14,
-    fontWeight: '700' as const,
-    color: Colors.primary,
-    marginBottom: 10,
-    textAlign: 'center' as const,
-  },
-  roleRow: {
-    flexDirection: 'row' as const,
-    gap: 12,
-    marginBottom: 18,
-  },
-  roleCard: {
-    flex: 1,
-    alignItems: 'center' as const,
-    padding: 14,
-    borderRadius: 16,
-    backgroundColor: Colors.surface,
-    borderWidth: 2,
-    borderColor: Colors.cardBorder,
-  },
-  roleCardActive: {
-    borderColor: Colors.primary,
-    backgroundColor: Colors.primary + '08',
-  },
-  roleIconBox: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: Colors.surface,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-    marginBottom: 8,
-    borderWidth: 1.5,
-    borderColor: Colors.cardBorder,
-  },
-  roleIconBoxActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  roleTitle: {
-    fontSize: 15,
-    fontWeight: '700' as const,
-    color: Colors.textSecondary,
-    marginBottom: 2,
-  },
-  roleTitleActive: {
-    color: Colors.primary,
-  },
-  roleDesc: {
-    fontSize: 11,
-    color: Colors.textMuted,
-    textAlign: 'center' as const,
-  },
   emailSentContainer: {
     alignItems: 'center' as const,
     marginBottom: 24,
@@ -794,6 +698,12 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 8,
     gap: 10,
+  },
+  adultWarning: {
+    fontSize: 13,
+    color: Colors.warning,
+    lineHeight: 18,
+    marginBottom: 2,
   },
   checkboxRow: {
     flexDirection: 'row' as const,
