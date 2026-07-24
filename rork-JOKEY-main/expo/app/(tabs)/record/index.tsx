@@ -30,6 +30,7 @@ import { useApp } from '@/contexts/AppContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { JokeCategory, Joke, Video } from '@/types';
 import { createJokeInDB, createVideoInDB, uploadAudioToSupabase, uploadVideoToSupabase } from '@/lib/db-client';
+import { notifyNewContentPublished } from '@/lib/push-devices-client';
 
 const MAX_DURATION = 180;
 const MAX_VIDEO_DURATION = 60;
@@ -429,6 +430,7 @@ export default function RecordScreen() {
         allowComments: newJoke.allowComments,
       }, currentUser).then(() => {
         console.log('[Record] Joke saved to Supabase with audio URL');
+        void notifyNewContentPublished('joke', newJoke.id);
       }).catch((err) => {
         console.warn('[Record] Failed to save to Supabase (local only):', err);
       });
@@ -511,6 +513,7 @@ export default function RecordScreen() {
         allowComments: newVideo.allowComments,
       }, currentUser).then(() => {
         console.log('[Record] Video saved to Supabase');
+        void notifyNewContentPublished('video', newVideo.id);
       }).catch((err) => {
         console.warn('[Record] Failed to save video to Supabase (local only):', err);
       });

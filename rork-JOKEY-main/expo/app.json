@@ -12,15 +12,13 @@
       "android": {
         "exclude": [
           "expo-location",
-          "react-native-maps",
-          "expo-notifications"
+          "react-native-maps"
         ]
       },
       "ios": {
         "exclude": [
           "expo-location",
-          "react-native-maps",
-          "expo-notifications"
+          "react-native-maps"
         ]
       }
     },
@@ -45,6 +43,9 @@
           "ar"
         ],
         "CFBundleDevelopmentRegion": "en",
+        "UIBackgroundModes": [
+          "remote-notification"
+        ],
         "NSMicrophoneUsageDescription": "Jokey uses your microphone to record audio jokes and video sound. For example, when you tap Record, your voice is captured and published as a joke for the community.",
         "NSCameraUsageDescription": "Jokey uses your camera to record video jokes. For example, when you record a video joke, the footage is saved and shared on your Jokey profile for other users to watch.",
         "NSPhotoLibraryUsageDescription": "Jokey accesses your photo library so you can choose a profile picture. For example, the photo you select will be displayed on your public profile for other users to see."
@@ -67,6 +68,11 @@
         "backgroundColor": "#ffffff"
       },
       "package": "app.rork.azbb4413e811lknfmyslw",
+      "permissions": [
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.VIBRATE",
+        "android.permission.RECEIVE_BOOT_COMPLETED"
+      ],
       "blockedPermissions": [
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
@@ -85,6 +91,15 @@
         "expo-router",
         {
           "origin": "https://rork.com/"
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#1565C0",
+          "defaultChannel": "jokey-content",
+          "sounds": []
         }
       ],
       "expo-font",
@@ -123,6 +138,11 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": ""
+      }
     }
   }
 }

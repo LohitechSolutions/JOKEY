@@ -28,6 +28,12 @@ import {
 } from '@/lib/image-jokes-client';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import {
+  notifyNewContentPublished,
+  removeCurrentPushDevice,
+  syncPushRegistration,
+} from '@/lib/push-devices-client';
+import { ensureAndroidNotificationChannel } from '@/lib/push-notifications';
 
 const PASSWORD_RECOVERY_USER = { __passwordRecovery: true } as const;
 type AuthRestoreResult = User | null | typeof PASSWORD_RECOVERY_USER;
@@ -535,6 +541,15 @@ export const [AppProvider, useApp] = createContextHook(() => {
     }
   }, [blockedUsersQuery.data]);
 
+  useEffect(() => {
+    void ensureAndroidNotificationChannel();
+  }, []);
+
+  useEffect(() => {
+    if (!currentUser?.id || !isAuthenticated) return;
+    void syncPushRegistration(currentUser.id, settings.notifications);
+  }, [currentUser?.id, isAuthenticated, settings.notifications]);
+
   const visibleJokes = useMemo(
     () => filterJokes(jokes, { safeMode: settings.safeMode, blockedUserIds }),
     [jokes, settings.safeMode, blockedUserIds]
@@ -723,6 +738,11 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const logoutMutation = useMutation({
     mutationFn: async () => {
       console.log('[AppContext] Logout mutation started');
+      try {
+        await removeCurrentPushDevice();
+      } catch (err) {
+        console.warn('[AppContext] push device cleanup on logout failed:', err);
+      }
       await signOutSupabase();
       console.log('[AppContext] signOutSupabase completed');
     },
@@ -1171,6 +1191,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     onSuccess: (joke) => {
       setImageJokes((prev) => [joke, ...prev]);
       queryClient.setQueryData<ImageJoke[]>(['image-jokes-list'], (prev) => [joke, ...(prev ?? [])]);
+      void notifyNewContentPublished('image', joke.id);
     },
   });
 

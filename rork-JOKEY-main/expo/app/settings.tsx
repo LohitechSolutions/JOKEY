@@ -28,6 +28,15 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { APP_VERSION, PRIVACY_POLICY_URL } from '@/constants/app-config';
 import { LANGUAGE_OPTIONS } from '@/constants/translations';
 import { showUnblockConfirm } from '@/lib/moderation-client';
+import {
+  getPushPermissionState,
+  openSystemNotificationSettings,
+  requestPushPermissions,
+} from '@/lib/push-notifications';
+import {
+  disableCurrentPushDevice,
+  upsertPushDevice,
+} from '@/lib/push-devices-client';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -40,12 +49,62 @@ export default function SettingsScreen() {
   // App is fully free - no subscription needed
   const { t, language, changeLanguage } = useLanguage();
   const [showLangPicker, setShowLangPicker] = React.useState(false);
+  const [pushBusy, setPushBusy] = React.useState(false);
 
-
-
-  const handleToggleNotifications = (val: boolean) => {
-    updateSettings({ ...settings, notifications: val });
+  const handleToggleNotifications = async (val: boolean) => {
+    if (pushBusy) return;
+    setPushBusy(true);
+    try {
+      if (val) {
+        const permission = await requestPushPermissions();
+        if (permission !== 'granted') {
+          updateSettings({ ...settings, notifications: false });
+          Alert.alert(
+            t('settings.notificationsPermissionTitle'),
+            t('settings.notificationsPermissionMsg'),
+            [
+              { text: t('common.cancel'), style: 'cancel' },
+              {
+                text: t('settings.openSystemSettings'),
+                onPress: () => {
+                  void openSystemNotificationSettings();
+                },
+              },
+            ]
+          );
+          return;
+        }
+        updateSettings({ ...settings, notifications: true });
+        if (currentUser?.id) {
+          await upsertPushDevice(currentUser.id, true);
+        }
+      } else {
+        updateSettings({ ...settings, notifications: false });
+        await disableCurrentPushDevice();
+      }
+    } catch (err) {
+      console.warn('[Settings] notification toggle failed:', err);
+      updateSettings({ ...settings, notifications: false });
+    } finally {
+      setPushBusy(false);
+    }
   };
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const state = await getPushPermissionState();
+      if (cancelled) return;
+      if (state === 'denied' && settings.notifications) {
+        updateSettings({ ...settings, notifications: false });
+      }
+    })().catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // Only reconcile once on mount against OS permission
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleToggleSafeMode = (val: boolean) => {
     updateSettings({ ...settings, safeMode: val });
@@ -119,14 +178,23 @@ export default function SettingsScreen() {
             <View style={[styles.iconBox, { backgroundColor: Colors.primary + '15' }]}>
               <Bell size={18} color={Colors.primary} />
             </View>
-            <Text style={styles.settingText}>{t('settings.notifications')}</Text>
+            <View>
+              <Text style={styles.settingText}>{t('settings.notifications')}</Text>
+              <Text style={styles.settingSubtext}>{t('settings.notificationsDesc')}</Text>
+            </View>
           </View>
-          <Switch
-            value={settings.notifications}
-            onValueChange={handleToggleNotifications}
-            trackColor={{ false: Colors.cardBorder, true: Colors.primary + '60' }}
-            thumbColor={settings.notifications ? Colors.primary : Colors.textMuted}
-          />
+          {pushBusy ? (
+            <ActivityIndicator size="small" color={Colors.primary} />
+          ) : (
+            <Switch
+              value={settings.notifications}
+              onValueChange={(v) => {
+                void handleToggleNotifications(v);
+              }}
+              trackColor={{ false: Colors.cardBorder, true: Colors.primary + '60' }}
+              thumbColor={settings.notifications ? Colors.primary : Colors.textMuted}
+            />
+          )}
         </View>
 
         <View style={styles.settingRow}>
