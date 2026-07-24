@@ -68,6 +68,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "app.rork.azbb4413e811lknfmyslw",
+      "googleServicesFile": "./google-services.json",
       "permissions": [
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.VIBRATE",

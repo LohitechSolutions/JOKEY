@@ -56,9 +56,8 @@ Put the UUID into `app.json` → `expo.extra.eas.projectId` (and optionally `EXP
 ### 4. Android FCM (so Jokey appears under system Notifications)
 
 1. Firebase Console → project for package `app.rork.azbb4413e811lknfmyslw`
-2. Download `google-services.json` into `rork-JOKEY-main/expo/`
-3. In `app.json` under `android`, add: `"googleServicesFile": "./google-services.json"`
-4. Upload the FCM v1 service account to EAS (Expo dashboard → credentials) or:
+2. `google-services.json` is already in `rork-JOKEY-main/expo/` and linked via `android.googleServicesFile`
+3. Upload the FCM v1 service account to EAS (Expo dashboard → credentials) or:
    ```bash
    eas credentials
    ```

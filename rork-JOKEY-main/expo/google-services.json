@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1057534903016",
+    "project_id": "jokey-3489e",
+    "storage_bucket": "jokey-3489e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1057534903016:android:59e33c240dede19532ff5d",
+        "android_client_info": {
+          "package_name": "app.rork.azbb4413e811lknfmyslw"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAev-fjqvEC8vfdIoJIQMjbnGa8eOwN4Ss"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

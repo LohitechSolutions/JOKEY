@@ -62,7 +62,7 @@ interface AppSettings {
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
-  notifications: true,
+  notifications: false,
   safeMode: false,
   autoplay: true,
 };

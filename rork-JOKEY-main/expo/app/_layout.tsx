@@ -2,13 +2,15 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
-import { View, ActivityIndicator, StyleSheet } from "react-native";
+import { View, ActivityIndicator, StyleSheet, Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { setAudioModeAsync } from "expo-audio";
+import * as Notifications from "expo-notifications";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AppProvider, useApp } from "@/contexts/AppContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import Colors from "@/constants/colors";
+import { ensureAndroidNotificationChannel } from "@/lib/push-notifications";
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -46,6 +48,35 @@ function RootLayoutNav() {
       router.replace('/');
     }
   }, [isAuthenticated, authChecked, isPasswordRecovery, preambleAccepted, segments, router]);
+
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+
+    void ensureAndroidNotificationChannel();
+
+    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+      try {
+        const data = response.notification.request.content.data as {
+          contentType?: string;
+          contentId?: string | null;
+        };
+        if (!data?.contentType) return;
+        if (data.contentType === 'joke' && data.contentId) {
+          router.push(`/joke/${data.contentId}`);
+        } else if (data.contentType === 'video') {
+          router.push('/(tabs)/videos');
+        } else if (data.contentType === 'image') {
+          router.push('/');
+        }
+      } catch (err) {
+        console.warn('[RootLayout] notification tap handler failed:', err);
+      }
+    });
+
+    return () => {
+      sub.remove();
+    };
+  }, [router]);
 
   if (!authChecked || preambleAccepted === null) {
     return (

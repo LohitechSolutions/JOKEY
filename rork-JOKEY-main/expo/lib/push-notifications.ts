@@ -119,6 +119,11 @@ export async function getExpoPushTokenSafe(): Promise<string | null> {
     if (permission !== 'granted') return null;
 
     const projectId = resolveProjectId();
+    if (!projectId) {
+      console.warn(
+        '[Push] Missing EAS projectId. Set expo.extra.eas.projectId in app.json (run: npx eas init).'
+      );
+    }
     const tokenResponse = projectId
       ? await Notifications.getExpoPushTokenAsync({ projectId })
       : await Notifications.getExpoPushTokenAsync();
